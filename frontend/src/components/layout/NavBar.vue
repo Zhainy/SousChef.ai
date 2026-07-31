@@ -23,6 +23,13 @@ import { RouterLink } from 'vue-router'
         >
           Asistente
         </RouterLink>
+        <RouterLink
+          to="/recetas"
+          class="rounded-full px-4 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-white"
+          active-class="bg-white text-amber-700 shadow-sm"
+        >
+          Recetas
+        </RouterLink>
       </nav>
     </div>
   </header>

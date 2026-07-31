@@ -5,7 +5,13 @@ from .models import Ingredient
 SEED = [
     {"nombre": "pechuga de pollo", "cantidad": 500, "unidad": "g", "categoria": "proteínas"},
     {"nombre": "huevos", "cantidad": 6, "unidad": "piezas", "categoria": "proteínas"},
-    {"nombre": "atún", "cantidad": 2, "unidad": "latas", "categoria": "proteínas"},
+    {
+        "nombre": "atún",
+        "cantidad": 2,
+        "unidad": "latas",
+        "categoria": "proteínas",
+        "gramos_por_unidad": 140,
+    },
     {"nombre": "carne molida de res", "cantidad": 400, "unidad": "g", "categoria": "proteínas"},
     {"nombre": "tomate", "cantidad": 3, "unidad": "piezas", "categoria": "verduras"},
     {"nombre": "cebolla", "cantidad": 2, "unidad": "piezas", "categoria": "verduras"},

@@ -31,6 +31,19 @@ def test_create_duplicate_returns_409(client):
     assert res.status_code == 409
 
 
+def test_create_ingredient_with_gramos_por_unidad(client):
+    payload = {
+        "nombre": "champiñones",
+        "cantidad": 3,
+        "unidad": "latas",
+        "categoria": "verduras",
+        "gramos_por_unidad": 200,
+    }
+    res = client.post("/api/ingredients", json=payload)
+    assert res.status_code == 201
+    assert res.json()["gramos_por_unidad"] == 200
+
+
 def test_patch_ingredient(client):
     items = client.get("/api/ingredients").json()
     target = next(i for i in items if i["nombre"] == "tomate")

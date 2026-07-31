@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { Ingredient } from '../../types'
 
 const props = defineProps<{ initial: Ingredient | null }>()
@@ -19,6 +19,11 @@ const UNIDADES = [
   'cucharaditas',
   'pizca',
   'al gusto',
+  'latas',
+  'lata',
+  'sobres',
+  'bolsas',
+  'paquete',
 ]
 
 const CATEGORIAS = [
@@ -36,9 +41,22 @@ const form = reactive({
   cantidad: 1,
   unidad: 'piezas',
   categoria: 'otros',
+  gramos_por_unidad: null as number | null,
 })
 
 const error = ref<string | null>(null)
+
+const PESO_POR_UNIDAD = new Set([
+  'piezas',
+  'unidades',
+  'latas',
+  'lata',
+  'sobres',
+  'bolsas',
+  'paquete',
+])
+
+const mostrarPesoPorUnidad = computed(() => PESO_POR_UNIDAD.has(form.unidad))
 
 watch(
   () => props.initial,
@@ -48,11 +66,13 @@ watch(
       form.cantidad = init.cantidad
       form.unidad = init.unidad
       form.categoria = init.categoria
+      form.gramos_por_unidad = init.gramos_por_unidad ?? null
     } else {
       form.nombre = ''
       form.cantidad = 1
       form.unidad = 'piezas'
       form.categoria = 'otros'
+      form.gramos_por_unidad = null
     }
     error.value = null
   },
@@ -74,15 +94,13 @@ function submit(): void {
     cantidad: Number(form.cantidad),
     unidad: form.unidad,
     categoria: form.categoria,
+    gramos_por_unidad: form.gramos_por_unidad,
   })
 }
 </script>
 
 <template>
-  <form
-    class="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
-    @submit.prevent="submit"
-  >
+  <form class="space-y-4" @submit.prevent="submit">
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label class="sm:col-span-2">
         <span class="text-sm font-medium text-stone-700">Nombre</span>
@@ -111,6 +129,20 @@ function submit(): void {
         >
           <option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option>
         </select>
+      </label>
+      <label v-if="mostrarPesoPorUnidad">
+        <span class="text-sm font-medium text-stone-700">Gramos por unidad</span>
+        <input
+          v-model.number="form.gramos_por_unidad"
+          type="number"
+          min="0.01"
+          step="0.01"
+          placeholder="Ej: 140"
+          class="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+        />
+        <span class="mt-1 block text-xs text-stone-400">
+          Peso de cada unidad para calcular stock en gramos
+        </span>
       </label>
       <label class="sm:col-span-2">
         <span class="text-sm font-medium text-stone-700">Categoría</span>

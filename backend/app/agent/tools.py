@@ -92,6 +92,7 @@ def get_inventario() -> dict[str, Any]:
                 "cantidad": i.cantidad,
                 "unidad": i.unidad,
                 "categoria": i.categoria,
+                "gramos_por_unidad": i.gramos_por_unidad,
             }
             for i in items
         ]

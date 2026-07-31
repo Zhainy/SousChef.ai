@@ -4,6 +4,7 @@ export interface Ingredient {
   cantidad: number
   unidad: string
   categoria: string
+  gramos_por_unidad?: number | null
   created_at?: string
 }
 
@@ -26,10 +27,27 @@ export interface Recipe {
 export interface StockResult {
   ok: boolean
   descontados: { nombre: string; cantidad: number; unidad: string }[]
-  faltantes: { nombre: string; pedido: number; disponible: number; motivo: string }[]
+  faltantes: {
+    nombre: string
+    pedido: number
+    disponible: number
+    unidad?: string | null
+    gramos_por_unidad?: number | null
+    motivo: string
+    detalle?: string | null
+  }[]
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+}
+
+export interface SavedRecipe {
+  hash: string
+  recipe: Recipe
+  imageUrl: string | null
+  favorited: boolean
+  createdAt: string
+  cookedAt: string | null
 }

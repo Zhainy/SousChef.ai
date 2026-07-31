@@ -30,7 +30,9 @@ SYSTEM_INSTRUCTION = (
     '[{"nombre": "...", "cantidad": 200, "unidad": "g"}], "instrucciones": "1. ...\\n2. ..."}\n'
     "```\n"
     '   - "cantidad" y "unidad" van en la misma unidad que tiene ese ingrediente en la '
-    "despensa (p. ej. g, ml, pieza, cucharada).\n"
+    "despensa (p. ej. g, ml, pieza, cucharada, lata).\n"
+    '   - Si un ingrediente usa "latas", "sobres" o "bolsas", el inventario incluye '
+    '"gramos_por_unidad"; puedes expresar la cantidad en gramos multiplicando por ese dato.\n'
     '   - Escribe "instrucciones" como pasos numerados (1. ..., 2. ...), uno por línea.\n'
     "   - No inventes ingredientes que no estén en el inventario.\n"
     "4. Solo llama a descontar_stock(ingredientes=[...]) cuando el usuario pida "

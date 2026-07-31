@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 from sqlmodel import Session, SQLModel, create_engine
@@ -14,6 +14,16 @@ engine = create_engine(
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
+    migrate(engine)
+
+
+def migrate(engine_: Any) -> None:
+    from sqlalchemy import inspect, text
+
+    cols = {c["name"] for c in inspect(engine_).get_columns("ingredient")}
+    if "gramos_por_unidad" not in cols:
+        with engine_.begin() as conn:
+            conn.execute(text("ALTER TABLE ingredient ADD COLUMN gramos_por_unidad FLOAT"))
 
 
 def get_session() -> Generator[Session, None, None]:

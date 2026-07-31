@@ -23,6 +23,14 @@ UNIDADES = {
     "cucharaditas",
     "pizca",
     "al gusto",
+    "lata",
+    "latas",
+    "sobre",
+    "sobres",
+    "bolsa",
+    "bolsas",
+    "paquete",
+    "paquetes",
 }
 
 
@@ -36,4 +44,5 @@ class Ingredient(SQLModel, table=True):
     cantidad: float = Field(ge=0)
     unidad: str
     categoria: str
+    gramos_por_unidad: float | None = Field(default=None, ge=0)
     created_at: datetime = Field(default_factory=utcnow)

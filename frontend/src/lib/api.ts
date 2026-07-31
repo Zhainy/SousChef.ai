@@ -77,6 +77,7 @@ export function cookRecipe(recipe: Recipe): Promise<StockResult> {
 export interface Faltante {
   nombre: string
   motivo: string
+  detalle?: string | null
 }
 
 export function faltantesFromError(error: unknown): Faltante[] {

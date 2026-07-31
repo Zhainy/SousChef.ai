@@ -1,21 +1,38 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Recipe } from '../../types'
 import { usePantryStore } from '../../stores/pantry'
-import { faltantesFromError } from '../../lib/api'
+import { useRecipesStore } from '../../stores/recipes'
+import { faltantesFromError, type Faltante } from '../../lib/api'
 
-const props = defineProps<{
-  recipe: Recipe
-  imageUrl: string | null
-  imagePending: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    recipe: Recipe
+    imageUrl: string | null
+    imagePending: boolean
+    showCook?: boolean
+    showView?: boolean
+  }>(),
+  {
+    showCook: false,
+    showView: true,
+  },
+)
 
+const router = useRouter()
 const store = usePantryStore()
+const recipesStore = useRecipesStore()
 const cooking = ref(false)
 const cooked = ref(false)
 const error = ref<string | null>(null)
-const faltantes = ref<{ nombre: string; motivo: string }[]>([])
+const faltantes = ref<Faltante[]>([])
 const showInstructions = ref(false)
+
+const favorited = computed(() => {
+  const hash = props.recipe.hash
+  return hash ? (recipesStore.getByHash(hash)?.favorited ?? false) : false
+})
 
 function formatAmount(cantidad: number): string {
   return Number.isInteger(cantidad) ? String(cantidad) : String(Math.round(cantidad * 100) / 100)
@@ -38,6 +55,30 @@ const instructionSteps = computed<string[] | null>(() => {
   return lines.map((line) => line.replace(/^\d+[.)]\s*/, ''))
 })
 
+onMounted(() => {
+  const hash = props.recipe.hash
+  if (hash) recipesStore.save(props.recipe, props.imageUrl)
+})
+
+watch(
+  () => props.imageUrl,
+  (url) => {
+    const hash = props.recipe.hash
+    if (hash) recipesStore.save(props.recipe, url)
+  },
+)
+
+function goToDetail(): void {
+  const hash = props.recipe.hash
+  if (!hash) return
+  router.push({ name: 'receta-detalle', params: { hash } })
+}
+
+function toggleFavorite(): void {
+  const hash = props.recipe.hash
+  if (hash) recipesStore.toggleFavorite(hash)
+}
+
 async function cook(): Promise<void> {
   if (cooking.value || cooked.value) return
   cooking.value = true
@@ -45,7 +86,11 @@ async function cook(): Promise<void> {
   faltantes.value = []
   try {
     const result = await store.cook({ ...props.recipe })
-    if (result.ok) cooked.value = true
+    if (result.ok) {
+      cooked.value = true
+      const hash = props.recipe.hash
+      if (hash) recipesStore.markCooked(hash)
+    }
   } catch (e) {
     const missing = faltantesFromError(e)
     if (missing.length > 0) faltantes.value = missing
@@ -58,7 +103,9 @@ async function cook(): Promise<void> {
 
 <template>
   <div
-    class="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
+    data-test="card"
+    class="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:border-stone-300"
+    @click="goToDetail"
   >
     <div class="relative aspect-[16/9] w-full bg-stone-100">
       <div
@@ -93,11 +140,30 @@ async function cook(): Promise<void> {
             ~{{ recipe.tiempo_minutos }} min
           </p>
         </div>
-        <span
-          class="shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800"
-        >
-          {{ recipe.ingredientes.length }} ingredientes
-        </span>
+        <div class="flex shrink-0 items-center gap-2">
+          <span
+            class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800"
+          >
+            {{ recipe.ingredientes.length }} ingredientes
+          </span>
+          <button
+            data-test="favorite"
+            :aria-label="favorited ? 'Quitar de favoritas' : 'Marcar como favorita'"
+            class="rounded-full p-1.5 transition hover:bg-stone-100"
+            @click.stop="toggleFavorite"
+          >
+            <svg
+              :class="favorited ? 'text-red-500' : 'text-stone-300 hover:text-red-400'"
+              class="h-5 w-5 transition"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path
+                d="M12 21s-7.5-4.7-10-9C.6 8.6 2.3 5 5.6 5c2 0 3.2 1.1 4.4 3 1.2-1.9 2.4-3 4.4-3 3.3 0 5 3.6 3.6 7-2.5 4.3-10 9-10 9z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <p v-if="recipe.resumen" class="mt-1 text-sm text-stone-600">
@@ -119,8 +185,9 @@ async function cook(): Promise<void> {
 
       <div v-if="recipe.instrucciones" class="mt-3">
         <button
+          data-test="toggle-instructions"
           class="text-sm font-medium text-amber-700 hover:text-amber-800"
-          @click="showInstructions = !showInstructions"
+          @click.stop="showInstructions = !showInstructions"
         >
           {{ showInstructions ? 'Ocultar instrucciones' : 'Ver instrucciones' }}
         </button>
@@ -143,16 +210,26 @@ async function cook(): Promise<void> {
         <p class="font-medium">No hay suficiente stock:</p>
         <ul class="mt-1 list-disc pl-5">
           <li v-for="f in faltantes" :key="f.nombre">
-            {{ f.nombre }} — {{ f.motivo }}
+            {{ f.nombre }} — {{ f.motivo
+            }}{{ f.detalle ? ` (${f.detalle})` : '' }}
           </li>
         </ul>
       </div>
 
       <button
+        v-if="showView && !showCook"
+        data-test="view"
+        class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 font-medium text-white transition hover:bg-amber-700"
+        @click.stop="goToDetail"
+      >
+        Ver receta
+      </button>
+      <button
+        v-else-if="showCook"
         data-test="cook"
         :disabled="cooking || cooked"
         class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 font-medium text-white transition hover:bg-amber-700 disabled:opacity-60"
-        @click="cook"
+        @click.stop="cook"
       >
         <span
           v-if="cooking"

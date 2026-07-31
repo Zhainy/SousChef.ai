@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import RecipeCard from './RecipeCard.vue'
+import { useRecipesStore } from '../../stores/recipes'
 import { ApiError, cookRecipe } from '../../lib/api'
 
 vi.mock('../../lib/api', async (importOriginal) => {
@@ -12,6 +13,11 @@ vi.mock('../../lib/api', async (importOriginal) => {
     fetchIngredients: vi.fn().mockResolvedValue([]),
   }
 })
+
+const push = vi.fn()
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push }),
+}))
 
 const mockedCook = vi.mocked(cookRecipe)
 
@@ -24,6 +30,7 @@ const recipe = {
     { nombre: 'limón', cantidad: 1, unidad: 'pieza' },
   ],
   instrucciones: '1. Cocinar el pollo.\n2. Añadir el limón.',
+  hash: 'abc123',
 }
 
 function mountCard(props: Record<string, unknown> = {}) {
@@ -35,7 +42,9 @@ function mountCard(props: Record<string, unknown> = {}) {
 describe('RecipeCard', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    localStorage.clear()
     mockedCook.mockReset()
+    push.mockReset()
   })
 
   it('muestra nombre, tiempo e ingredientes', () => {
@@ -47,10 +56,41 @@ describe('RecipeCard', () => {
     expect(wrapper.text()).toContain('1 pieza')
   })
 
+  it('registra la receta en el store al montar', () => {
+    mountCard()
+    const store = useRecipesStore()
+    expect(store.getByHash('abc123')).toBeDefined()
+  })
+
+  it('en modo chat muestra "Ver receta" y navega al detalle sin cocinar', async () => {
+    const wrapper = mountCard()
+    const view = wrapper.find('[data-test="view"]')
+    expect(view.exists()).toBe(true)
+    expect(view.text()).toBe('Ver receta')
+    expect(wrapper.find('[data-test="cook"]').exists()).toBe(false)
+    await view.trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'receta-detalle', params: { hash: 'abc123' } })
+    expect(mockedCook).not.toHaveBeenCalled()
+  })
+
+  it('la card clicable navega al detalle', async () => {
+    const wrapper = mountCard({ showView: false })
+    await wrapper.find('[data-test="card"]').trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'receta-detalle', params: { hash: 'abc123' } })
+  })
+
+  it('el corazón marca favorita sin navegar', async () => {
+    const wrapper = mountCard()
+    await wrapper.find('[data-test="favorite"]').trigger('click')
+    const store = useRecipesStore()
+    expect(store.getByHash('abc123')?.favorited).toBe(true)
+    expect(push).not.toHaveBeenCalled()
+  })
+
   it('muestra las instrucciones como lista numerada', async () => {
     const wrapper = mountCard()
     expect(wrapper.find('ol').exists()).toBe(false)
-    await wrapper.find('button').trigger('click')
+    await wrapper.find('[data-test="toggle-instructions"]').trigger('click')
     const steps = wrapper.findAll('ol li')
     expect(steps).toHaveLength(2)
     expect(steps[0].text()).toBe('Cocinar el pollo.')
@@ -68,32 +108,41 @@ describe('RecipeCard', () => {
     expect(wrapper.find('img').attributes('src')).toBe('/static/x.png')
   })
 
-  it('cocina y marca la receta como cocinada', async () => {
+  it('en modo detalle cocina, descuenta stock y marca cookedAt', async () => {
     mockedCook.mockResolvedValue({
       ok: true,
       descontados: [{ nombre: 'pollo', cantidad: 300, unidad: 'g' }],
       faltantes: [],
     })
-    const wrapper = mountCard()
-    await wrapper.find(`[data-test="cook"]`).trigger("click")
+    const wrapper = mountCard({ showCook: true })
+    expect(wrapper.find('[data-test="view"]').exists()).toBe(false)
+    await wrapper.find('[data-test="cook"]').trigger('click')
     await flushPromises()
     expect(mockedCook).toHaveBeenCalled()
     expect(wrapper.text()).toContain('¡Cocinada!')
+    const store = useRecipesStore()
+    expect(store.getByHash('abc123')?.cookedAt).not.toBeNull()
   })
 
   it('muestra los faltantes ante un 409', async () => {
     mockedCook.mockRejectedValue(
       new ApiError(409, {
         detail: {
-          faltantes: [{ nombre: 'pollo', motivo: 'stock insuficiente' }],
+          faltantes: [
+            {
+              nombre: 'atún',
+              motivo: 'stock insuficiente',
+              detalle: 'disponible: 2 latas (≈ 280 g)',
+            },
+          ],
         },
       }),
     )
-    const wrapper = mountCard()
-    await wrapper.find(`[data-test="cook"]`).trigger("click")
+    const wrapper = mountCard({ showCook: true })
+    await wrapper.find('[data-test="cook"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('No hay suficiente stock')
-    expect(wrapper.text()).toContain('pollo')
     expect(wrapper.text()).toContain('stock insuficiente')
+    expect(wrapper.text()).toContain('disponible: 2 latas (≈ 280 g)')
   })
 })

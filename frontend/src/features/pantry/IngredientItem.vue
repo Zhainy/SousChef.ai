@@ -17,6 +17,9 @@ const emit = defineEmits<{
       <p class="truncate font-medium">{{ ingredient.nombre }}</p>
       <p class="text-sm text-stone-500">
         {{ ingredient.cantidad }} {{ ingredient.unidad }}
+        <span v-if="ingredient.gramos_por_unidad">
+          (≈ {{ ingredient.gramos_por_unidad }} g/unidad)
+        </span>
       </p>
     </div>
     <div class="flex shrink-0 items-center gap-2">

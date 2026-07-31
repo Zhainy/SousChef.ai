@@ -6,6 +6,7 @@ class IngredientCreate(BaseModel):
     cantidad: float = Field(gt=0)
     unidad: str = Field(min_length=1, max_length=40)
     categoria: str = Field(min_length=1, max_length=40)
+    gramos_por_unidad: float | None = Field(default=None, gt=0)
 
 
 class IngredientUpdate(BaseModel):
@@ -13,6 +14,7 @@ class IngredientUpdate(BaseModel):
     cantidad: float | None = Field(default=None, gt=0)
     unidad: str | None = Field(default=None, min_length=1, max_length=40)
     categoria: str | None = Field(default=None, min_length=1, max_length=40)
+    gramos_por_unidad: float | None = Field(default=None, gt=0)
 
 
 class RecipeIngredient(BaseModel):

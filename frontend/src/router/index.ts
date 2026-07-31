@@ -13,6 +13,16 @@ const router = createRouter({
       name: 'chat',
       component: () => import('../features/chat/ChatView.vue'),
     },
+    {
+      path: '/recetas',
+      name: 'recetas',
+      component: () => import('../features/recipes/RecipesView.vue'),
+    },
+    {
+      path: '/recetas/:hash',
+      name: 'receta-detalle',
+      component: () => import('../features/recipes/RecipeDetailView.vue'),
+    },
   ],
 })
 
