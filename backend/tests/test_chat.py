@@ -1,3 +1,5 @@
+import json
+
 from google.genai import types
 
 from app.agent.agent import stream_chat
@@ -218,7 +220,7 @@ def test_preserves_thought_signature_and_function_id(patched_tools):
 def test_retries_transient_errors_before_content(monkeypatch):
     import asyncio
 
-    monkeypatch.setattr("app.agent.agent.RETRY_DELAY", 0)
+    monkeypatch.setattr("app.agent.llm.RETRY_DELAY", 0)
 
     class _Retryable(Exception):
         code = 503
@@ -274,7 +276,7 @@ def test_retries_transient_errors_before_content(monkeypatch):
 
 
 def test_chat_endpoint_sse(client, monkeypatch):
-    from app.agent import agent as agent_mod
+    from app.agent import llm as llm_mod
 
     fake = FakeClient(
         [
@@ -282,8 +284,9 @@ def test_chat_endpoint_sse(client, monkeypatch):
             FakeGen([_text_chunk(f"Receta lista.\n```json\n{RECIPE_JSON}\n```")]),
         ]
     )
-    monkeypatch.setattr(agent_mod.genai, "Client", lambda *a, **k: fake)
-    monkeypatch.setattr(agent_mod.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(llm_mod.genai, "Client", lambda *a, **k: fake)
+    monkeypatch.setattr(llm_mod.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(llm_mod.settings, "llm_provider", "gemini")
     res = client.post("/api/chat", json={"messages": [{"role": "user", "content": "¿qué cocino?"}]})
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/event-stream")
@@ -291,3 +294,128 @@ def test_chat_endpoint_sse(client, monkeypatch):
     assert "event: tool_call" in res.text
     assert "event: recipe" in res.text
     assert "event: done" in res.text
+
+
+def _llama_body(*chunks: dict) -> bytes:
+    body = "".join(f"data: {json.dumps(c)}\n" for c in chunks) + "data: [DONE]\n"
+    return body.encode()
+
+
+def _llama_content(text: str) -> dict:
+    return {"choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}]}
+
+
+def _llama_tool_fragment(index: int, *, id=None, name=None, arguments=None) -> dict:
+    tool_call: dict = {"index": index}
+    if id is not None:
+        tool_call["id"] = id
+    if name is not None or arguments is not None:
+        function: dict = {}
+        if name is not None:
+            function["name"] = name
+        if arguments is not None:
+            function["arguments"] = arguments
+        tool_call["function"] = function
+    delta = {"tool_calls": [tool_call]}
+    return {"choices": [{"index": 0, "delta": delta, "finish_reason": None}]}
+
+
+def _llama_stop(finish: str) -> dict:
+    return {"choices": [{"index": 0, "delta": {}, "finish_reason": finish}]}
+
+
+def test_local_stream_text_only():
+    import asyncio
+
+    import httpx
+
+    from app.agent.llm import local_stream
+
+    body = _llama_body(
+        _llama_content("Hola "),
+        _llama_content("chef!"),
+        _llama_stop("stop"),
+    )
+
+    def handler(request):
+        return httpx.Response(200, content=body)
+
+    async def _collect():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return [e async for e in local_stream([], client=http)]
+
+    events = asyncio.run(_collect())
+    assert [(e.kind, e.data) for e in events] == [
+        ("token", "Hola "),
+        ("token", "chef!"),
+        ("text", "Hola chef!"),
+    ]
+
+
+def test_local_stream_tool_loop_and_recipe(patched_tools):
+    import asyncio
+
+    import httpx
+
+    from app.agent.llm import local_stream
+
+    turn1 = _llama_body(
+        _llama_tool_fragment(0, id="call-1", name="get_inventario", arguments="{"),
+        _llama_tool_fragment(0, arguments="}"),
+        _llama_stop("tool_calls"),
+    )
+    turn2 = _llama_body(
+        _llama_content(f"Te propongo:\n```json\n{RECIPE_JSON}\n```"),
+        _llama_stop("stop"),
+    )
+    bodies = [turn1, turn2]
+    seen_requests: list[dict] = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        seen_requests.append(payload)
+        return httpx.Response(200, content=bodies[len(seen_requests) - 1])
+
+    async def _collect():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return [e async for e in local_stream([], client=http)]
+
+    events = asyncio.run(_collect())
+    assert [e.kind for e in events] == ["tool_call", "tool_result", "token", "text"]
+    assert events[0].data["name"] == "get_inventario"
+    assert events[1].data["name"] == "get_inventario"
+    assert "inventario" in events[1].data["result"]
+    assert events[3].data == f"Te propongo:\n```json\n{RECIPE_JSON}\n```"
+
+    assert len(seen_requests) == 2
+    assert seen_requests[0]["messages"][0]["role"] == "system"
+    tool_message = seen_requests[1]["messages"][-1]
+    assert tool_message["role"] == "tool"
+    assert tool_message["tool_call_id"] == "call-1"
+    assert "inventario" in tool_message["content"]
+    assistant_message = seen_requests[1]["messages"][-2]
+    assert assistant_message["role"] == "assistant"
+    assert assistant_message["tool_calls"][0]["id"] == "call-1"
+
+
+def test_stream_chat_local_provider(monkeypatch, patched_tools):
+    import asyncio
+
+    from app.agent import agent as agent_mod
+    from app.agent.llm import TurnEvent
+    from app.schemas import ChatMessage
+
+    async def fake_local_stream(messages):
+        yield TurnEvent("token", "Hola local!")
+        yield TurnEvent("text", "Hola local!")
+
+    monkeypatch.setattr(agent_mod, "local_stream", fake_local_stream)
+    monkeypatch.setattr(agent_mod.settings, "llm_provider", "local")
+
+    async def _collect():
+        return [e async for e in stream_chat([ChatMessage(role="user", content="hola")])]
+
+    events = asyncio.run(_collect())
+    assert [e.event for e in events] == ["token", "done"]
+    assert "".join(e.data["delta"] for e in events if e.event == "token") == "Hola local!"
+    assert next(e for e in events if e.event == "done").data["message"] == "Hola local!"

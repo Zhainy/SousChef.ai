@@ -10,12 +10,12 @@ dependencies = [
     "pydantic-settings",
     "google-genai",
     "pillow",
+    "httpx",
 ]
 
 [dependency-groups]
 dev = [
     "pytest",
-    "httpx",
     "ruff",
 ]
 
