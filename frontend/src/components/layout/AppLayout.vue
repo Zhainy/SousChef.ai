@@ -1,6 +1,27 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
+import AppLoader from '../ui/AppLoader.vue'
 import NavBar from './NavBar.vue'
+
+const NAV_DELAY_MS = 2000
+
+const route = useRoute()
+const navigating = ref(false)
+let timer: number | undefined
+
+watch(
+  () => route.fullPath,
+  () => {
+    navigating.value = true
+    clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      navigating.value = false
+    }, NAV_DELAY_MS)
+  },
+)
+
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>
@@ -11,10 +32,16 @@ import NavBar from './NavBar.vue'
     />
     <div class="relative z-10">
       <NavBar />
-      <main class="mx-auto max-w-5xl px-4 py-8">
+      <main class="mx-auto flex max-w-5xl flex-col px-4 py-8">
         <RouterView v-slot="{ Component }">
           <Transition name="route" mode="out-in">
-            <component :is="Component" />
+            <div
+              v-if="navigating"
+              class="flex min-h-[50vh] flex-1 items-center justify-center"
+            >
+              <AppLoader size="lg" tone="saffron" :role="null" />
+            </div>
+            <component v-else :is="Component" />
           </Transition>
         </RouterView>
       </main>

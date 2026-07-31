@@ -1,18 +1,35 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { useRecipesStore } from '../../stores/recipes'
+import AppLoader from '../../components/ui/AppLoader.vue'
 import RecipeCard from '../chat/RecipeCard.vue'
+
+const TAB_DELAY_MS = 2000
 
 type Tab = 'dia' | 'generadas' | 'favoritas'
 
 const store = useRecipesStore()
 const activeTab = ref<Tab>('dia')
+const switching = ref(false)
+let tabTimer: number | undefined
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'dia', label: 'Receta del día' },
   { id: 'generadas', label: 'Generadas hoy' },
   { id: 'favoritas', label: 'Favoritas' },
 ]
+
+function selectTab(id: Tab): void {
+  if (id === activeTab.value) return
+  activeTab.value = id
+  switching.value = true
+  clearTimeout(tabTimer)
+  tabTimer = window.setTimeout(() => {
+    switching.value = false
+  }, TAB_DELAY_MS)
+}
+
+onBeforeUnmount(() => clearTimeout(tabTimer))
 </script>
 
 <template>
@@ -41,14 +58,22 @@ const tabs: { id: Tab; label: string }[] = [
             ? 'bg-basil-800 text-oat-50 shadow-sm'
             : 'text-ink-500 hover:bg-basil-50 hover:text-basil-700',
         ]"
-        @click="activeTab = t.id"
+        @click="selectTab(t.id)"
       >
         {{ t.label }}
       </button>
     </div>
 
     <Transition name="tab" mode="out-in">
-      <section v-if="activeTab === 'dia'" key="dia">
+      <div
+        v-if="switching"
+        key="tab-loader"
+        class="flex min-h-48 items-center justify-center py-10"
+      >
+        <AppLoader size="lg" tone="saffron" :role="null" />
+      </div>
+
+      <section v-else-if="activeTab === 'dia'" key="dia">
         <div v-if="store.delDia" class="max-w-md">
           <RecipeCard
             :recipe="store.delDia.recipe"

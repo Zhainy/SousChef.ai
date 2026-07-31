@@ -51,6 +51,29 @@
     @apply bg-oat-50 font-sans text-ink-900 antialiased;
   }
 
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-basil-300) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-basil-300);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-basil-500);
+  }
+
   ::selection {
     @apply bg-saffron-300/60 text-basil-950;
   }
@@ -59,6 +82,13 @@
 @layer components {
   .input-field {
     @apply w-full rounded-xl border border-oat-200 bg-white/80 px-3 py-2 text-sm shadow-sm transition focus:border-basil-500 focus:outline-none focus:ring-4 focus:ring-basil-100;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }
 

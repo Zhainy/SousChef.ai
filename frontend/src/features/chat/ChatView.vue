@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import AppLoader from '../../components/ui/AppLoader.vue'
 import ChatInput from './ChatInput.vue'
 import ChatMessage from './ChatMessage.vue'
 
@@ -12,6 +13,18 @@ const suggestions = [
   'Sugiere una cena rápida con pollo',
   '¿Qué merienda saludable puedo hacer?',
 ]
+
+const thinking = computed(() => {
+  const last = store.messages[store.messages.length - 1]
+  return (
+    store.streaming &&
+    !!last &&
+    last.role === 'assistant' &&
+    !last.content &&
+    !last.recipe &&
+    !last.error
+  )
+})
 
 function scrollToBottom(): void {
   nextTick(() => {
@@ -32,7 +45,7 @@ async function send(content: string): Promise<void> {
 
 <template>
   <div class="mx-auto flex h-[calc(100dvh-11.5rem)] max-w-3xl flex-col gap-4">
-    <div ref="listEl" class="flex-1 space-y-4 overflow-y-auto pr-1">
+    <div ref="listEl" class="chat-scroll relative flex-1 overflow-y-auto pr-1">
       <div v-if="store.messages.length === 0" class="flex h-full flex-col items-center justify-center text-center">
         <div class="animate-float relative mb-6">
           <div
@@ -88,19 +101,23 @@ async function send(content: string): Promise<void> {
         </div>
       </div>
 
-      <ChatMessage
-        v-for="(entry, index) in store.messages"
-        :key="entry.id"
-        :entry="entry"
-        :pending="
-          store.streaming &&
-          index === store.messages.length - 1 &&
-          entry.role === 'assistant' &&
-          !entry.content &&
-          !entry.recipe &&
-          !entry.error
-        "
-      />
+      <TransitionGroup v-else name="message" tag="div" class="space-y-4">
+        <ChatMessage
+          v-for="(entry, index) in store.messages"
+          :key="entry.id"
+          :entry="entry"
+          :pending="index === store.messages.length - 1 && thinking"
+        />
+      </TransitionGroup>
+
+      <Transition name="thinking">
+        <div
+          v-if="thinking"
+          class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+        >
+          <AppLoader size="lg" tone="saffron" :role="null" />
+        </div>
+      </Transition>
     </div>
     <ChatInput :disabled="store.streaming" @send="send" />
   </div>
@@ -113,5 +130,48 @@ async function send(content: string): Promise<void> {
 }
 .chat-hero-steam + .chat-hero-steam {
   animation-delay: 0.5s;
+}
+
+.message-enter-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.message-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+}
+.message-move {
+  transition: transform 0.3s ease;
+}
+
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-basil-300) transparent;
+}
+.chat-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-basil-300);
+  border-radius: 9999px;
+}
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-basil-500);
+}
+
+.thinking-enter-active,
+.thinking-leave-active {
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.thinking-enter-from,
+.thinking-leave-to {
+  opacity: 0;
+  transform: scale(0.92);
 }
 </style>

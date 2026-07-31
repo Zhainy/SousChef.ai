@@ -18,14 +18,14 @@ function entry(overrides: Partial<ChatEntry>): ChatEntry {
 }
 
 describe('ChatMessage', () => {
-  it('muestra el indicador de escritura mientras está pendiente', () => {
+  it('muestra los puntitos animados mientras el asistente piensa', () => {
     const wrapper = mount(ChatMessage, {
       props: { entry: entry({}), pending: true },
     })
     expect(wrapper.find('[role="status"]').exists()).toBe(true)
   })
 
-  it('no muestra el indicador si ya hay contenido', () => {
+  it('no muestra los puntitos si ya hay contenido', () => {
     const wrapper = mount(ChatMessage, {
       props: { entry: entry({ content: 'Hola' }), pending: true },
     })

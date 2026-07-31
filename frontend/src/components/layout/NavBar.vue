@@ -12,11 +12,20 @@ import { RouterLink } from 'vue-router'
           class="flex h-9 w-9 items-center justify-center rounded-xl bg-basil-800 shadow-inner transition-transform duration-300 group-hover:-rotate-6"
           aria-hidden="true"
         >
-          <svg viewBox="0 0 32 32" class="h-5 w-5" fill="none">
+          <svg viewBox="0 0 32 32" class="h-5 w-5" fill="none" aria-hidden="true">
             <path d="M6 10h20v2H6z" fill="#e8a33d" opacity=".85" />
             <path d="M6 12h20c0 5-1.5 8-10 8S6 17 6 12z" fill="#e8a33d" />
             <path
-              d="M12 5c0-1.5 1-2 1-3.5M18 5c0-1.5 1-2 1-3.5"
+              class="nav-steam"
+              d="M12 5c0-1.5 1-2 1-3.5"
+              stroke="#f4c471"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              class="nav-steam"
+              style="animation-delay: 0.55s"
+              d="M18 5c0-1.5 1-2 1-3.5"
               stroke="#f4c471"
               stroke-width="2"
               stroke-linecap="round"
@@ -49,3 +58,10 @@ import { RouterLink } from 'vue-router'
     </div>
   </header>
 </template>
+
+<style scoped>
+.nav-steam {
+  transform-origin: center;
+  animation: steam 1.4s ease-in-out infinite;
+}
+</style>

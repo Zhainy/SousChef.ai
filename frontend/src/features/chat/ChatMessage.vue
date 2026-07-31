@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ChatEntry } from '../../stores/chat'
 import AppLoader from '../../components/ui/AppLoader.vue'
-import MarkdownText from '../../components/MarkdownText.vue'
 import RecipeCard from './RecipeCard.vue'
 import TypingIndicator from './TypingIndicator.vue'
 
@@ -28,11 +27,7 @@ defineProps<{ entry: ChatEntry; pending?: boolean }>()
         <AppLoader size="sm" tone="saffron" role="progress" />
         {{ entry.toolStatus }}
       </p>
-      <MarkdownText
-        v-if="entry.content && entry.role === 'assistant'"
-        :text="entry.content"
-      />
-      <p v-else-if="entry.content" class="whitespace-pre-wrap">{{ entry.content }}</p>
+      <p v-if="entry.content" class="whitespace-pre-wrap">{{ entry.content }}</p>
       <TypingIndicator v-else-if="pending" class="py-1" />
       <RecipeCard
         v-if="entry.recipe"

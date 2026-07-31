@@ -101,19 +101,6 @@ async function confirmRemove(): Promise<void> {
         class="flex shrink-0 items-center gap-1.5 rounded-full bg-basil-800 px-5 py-2.5 text-sm font-semibold text-oat-50 shadow-lg shadow-basil-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-basil-700 hover:shadow-xl hover:shadow-basil-900/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron-500"
         @click="openCreate"
       >
-        <svg
-          viewBox="0 0 20 20"
-          class="h-4 w-4 transition-transform duration-200 group-hover:rotate-90"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M10 4v12M4 10h12"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-        </svg>
         + Agregar ingrediente
       </button>
     </div>
