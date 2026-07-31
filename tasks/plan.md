@@ -10,6 +10,9 @@
 - **Fase 5 — Feature Despensa**: `lib/api.ts`, `stores/pantry.ts`, componentes pantry (list, form, filters, item), vista + navegación.
 - **Fase 6 — Feature Chat**: `lib/sse.ts`, `stores/chat.ts`, componentes chat (input, message, RecipeCard con spinner + botón cocinar), integración con `/api/recipes/cook`.
 - **Fase 7 — Integración**: servir `dist` desde backend, README, verificación end-to-end, revisión final.
+- **Fase 8 — Unidades por envase y gramos** (completada): `gramos_por_unidad` en Ingredient + migración idempotente, conversión unit-aware en `descontar_stock`, UI + tests.
+- **Fase 9 — Vista de recetas** (completada): `stores/recipes.ts` en localStorage, `RecipesView`/`RecipeDetailView`, botones Ver receta / corazón / Cocinar, toasts y AppModal. Spec en `specs/recetas.md`.
+- **Fase 10 — Robustez del chat e imágenes** (completada): markdown sanitizado (`marked` + `dompurify`), recorte de la cerca ``` en el streaming, `normalize_recipe()` + `/cook` tolerante (400), resaltado del nombre del plato en basil-700, imagen con fallback web (TheMealDB → Wikimedia Commons) vía `IMAGE_SOURCE`.
 
 ## Dependencias
 ```

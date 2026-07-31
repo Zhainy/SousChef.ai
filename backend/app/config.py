@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash"
     image_model: str = "gemini-3-pro-image-preview"
+    image_source: str = "auto"
     llm_provider: str = "local"
     local_llm_base_url: str = "http://127.0.0.1:8080/v1"
     local_llm_model: str = "qwen3.5-4b"

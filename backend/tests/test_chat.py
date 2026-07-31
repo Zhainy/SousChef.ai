@@ -81,8 +81,12 @@ def test_simple_text_streams_tokens():
     assert next(e for e in events if e.event == "done").data["message"] == "Hola chef!"
 
 
-def test_tool_call_loop_and_recipe():
+def test_tool_call_loop_and_recipe(monkeypatch):
     import asyncio
+
+    from app.agent import agent as agent_mod
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
 
     turns = [
         FakeGen([_fc_chunk("get_inventario", {})]),
@@ -276,7 +280,10 @@ def test_retries_transient_errors_before_content(monkeypatch):
 
 
 def test_chat_endpoint_sse(client, monkeypatch):
+    from app.agent import agent as agent_mod
     from app.agent import llm as llm_mod
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
 
     fake = FakeClient(
         [

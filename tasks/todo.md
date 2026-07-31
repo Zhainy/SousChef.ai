@@ -40,3 +40,23 @@
 - [x] Proveedor local: llama-server + Qwen3.5-4B (scripts/serve_local.sh), config LLM_PROVIDER
 - [x] Verificación e2e real: tool calling local, multi-turno (receta + descontar_stock), parser SSE
 - [x] Revisión final: 26 tests backend + 11 frontend, ruff, type-check
+
+## Fase 8 — Unidades por envase y gramos
+- [x] Ingredient.gramos_por_unidad + migración idempotente (`db.migrate`) + seed (atún: lata 140 g)
+- [x] Conversión unit-aware en descontar_stock: mismo envase, mismo gramaje, unidad incompatible
+- [x] UI: form, item y card muestran gramos/envase; get_inventario expone gramos_por_unidad al LLM
+- [x] Tests: test_cook.py (envases, kg→g, incompatibles, 409 con detalle en gramos)
+
+## Fase 9 — Vista de recetas
+- [x] stores/recipes.ts (localStorage `souschef.recipes.v1`, prune 7 días) + watch del chat
+- [x] RecipeCard: "Ver receta" (chat), solo clicable (lista), corazón favorito, "Cocinar receta" (detalle)
+- [x] RecetasView (Receta del día / Generadas hoy / Favoritas) + RecipeDetailView (/recetas/:hash)
+- [x] Toasts + AppModal; tests: recipes store, RecipeCard, RecipesView, RecipeDetailView
+- [x] specs/recetas.md
+
+## Fase 10 — Robustez del chat e imágenes
+- [x] Markdown del LLM renderizado con marked + DOMPurify (MarkdownText.vue); strong en basil-700
+- [x] Sin `<pre>` crudo: el backend no streamea el JSON cercado (recorte en ```); strip/trim/highlight del nombre en chat.ts
+- [x] /cook tolerante: normalize_recipe() + payload dict → 400; mensaje amigable ante 422 en la card
+- [x] Imagen con fallback web: IMAGE_SOURCE (auto/gemini/web), TheMealDB (tier free) → Wikimedia Commons
+- [x] Test: test_image_service.py; 38 tests backend + 50 frontend

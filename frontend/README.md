@@ -1,5 +1,48 @@
-# Vue 3 + TypeScript + Vite
+# SousChef.ai — Frontend
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Frontend Vue 3 + TypeScript del asistente de cocina. CRUD de despensa, chat con IA
+(streaming SSE), cards de receta con imagen y vista de recetas generadas.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## Stack
+
+- Vue 3 (`<script setup lang="ts">`), Pinia, Vue Router, Tailwind CSS v4, Vite, vitest
+- `marked` + `dompurify` para renderizar el markdown del asistente de forma segura
+
+## Scripts
+
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Dev server en :5173 (proxy a `/api` y `/static`) |
+| `npm run build` | `vue-tsc -b && vite build` → `dist/` |
+| `npm run type-check` | `vue-tsc -b` |
+| `npm run test` | `vitest run` |
+| `npm run preview` | Previsualiza el build |
+
+## Estructura
+
+```
+src/
+  main.ts, App.vue, assets/main.css (Tailwind v4)
+  router/index.ts              # /, /chat, /recetas, /recetas/:hash
+  stores/
+    pantry.ts                  # CRUD de ingredientes
+    chat.ts                    # streaming SSE del chat (recibe token/recipe/recipe_image)
+    recipes.ts                 # recetas guardadas en localStorage (souschef.recipes.v1)
+  lib/
+    api.ts                     # cliente fetch + ApiError
+    sse.ts                     # SSE vía POST + ReadableStream
+  components/
+    MarkdownText.vue           # markdown sanitizado (marked + DOMPurify)
+    AppModal.vue, ToastStack.vue, ui/
+  features/
+    pantry/                    # IngredientForm, IngredientList, IngredientItem, IngredientFilters, PantryView, SkeletonPantry
+    chat/                      # ChatView, ChatMessage, ChatInput, RecipeCard, TypingIndicator
+    recipes/                   # RecipesView (día / generadas hoy / favoritas), RecipeDetailView
+  features/layout/             # AppLayout, NavBar
+```
+
+## Notas
+
+- El store de recetas persiste en `localStorage` y descarta no favoritas de más de 7 días.
+- El nombre del plato se resalta en negritas `basil-700` en la respuesta del chat.
+- Tests en `*.test.ts` junto a cada módulo (vitest + @vue/test-utils + jsdom).
