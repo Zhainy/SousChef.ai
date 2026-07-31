@@ -1,0 +1,33 @@
+[project]
+name = "souschef-backend"
+version = "0.1.0"
+description = "Backend de SousChef.ai: despensa + agente IA con Tool Calling"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]",
+    "uvicorn[standard]",
+    "sqlmodel",
+    "pydantic-settings",
+    "google-genai",
+    "pillow",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+    "ruff",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
