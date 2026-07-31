@@ -32,6 +32,14 @@ const dot: Record<string, string> = {
         <span :class="dot[toast.type]" class="h-2 w-2 shrink-0 rounded-full" />
         <span>{{ toast.message }}</span>
         <button
+          v-if="toast.action"
+          data-test="toast-action"
+          class="rounded-full bg-basil-800 px-3 py-1 text-xs font-semibold text-oat-50 transition hover:bg-basil-700"
+          @click="() => { toast.action?.onClick(); store.dismiss(toast.id) }"
+        >
+          {{ toast.action.label }}
+        </button>
+        <button
           aria-label="Cerrar notificación"
           class="rounded p-1 leading-none opacity-60 transition hover:opacity-100"
           @click="store.dismiss(toast.id)"

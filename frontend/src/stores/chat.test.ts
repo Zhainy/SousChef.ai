@@ -33,6 +33,26 @@ async function* genStream() {
   for (const ev of events()) yield ev
 }
 
+async function* textOnlyStream() {
+  yield { event: 'token', data: { delta: 'Solo ' } }
+  yield { event: 'token', data: { delta: 'texto.' } }
+  yield { event: 'done', data: { message: 'Solo texto.' } }
+}
+
+async function* recipeOnlyStream() {
+  yield {
+    event: 'recipe',
+    data: {
+      nombre: 'Pollo al limón',
+      ingredientes: [{ nombre: 'pollo', cantidad: 300 }],
+      hash: 'abc123',
+      image_url: null,
+    },
+  }
+  yield { event: 'recipe_image', data: { hash: 'abc123', image_url: '/static/x.png' } }
+  yield { event: 'done', data: { message: '' } }
+}
+
 describe('useChatStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -166,5 +186,107 @@ describe('useChatStore', () => {
     const store = useChatStore()
     await store.send('   ')
     expect(store.messages).toHaveLength(0)
+  })
+
+  it('forceRecipe adjunta la card al mensaje existente sin crear mensajes', async () => {
+    mockedStream.mockReturnValueOnce(textOnlyStream())
+    const store = useChatStore()
+    await store.send('hola')
+    expect(store.messages).toHaveLength(2)
+    expect(store.messages[1].content).toBe('Solo texto.')
+    expect(store.messages[1].recipe).toBeNull()
+
+    mockedStream.mockReturnValueOnce(recipeOnlyStream())
+    await store.forceRecipe()
+    expect(store.messages).toHaveLength(2)
+    const last = store.messages[1]
+    expect(last.recipe?.nombre).toBe('Pollo al limón')
+    expect(last.imageUrl).toBe('/static/x.png')
+    expect(last.imagePending).toBe(false)
+    expect(store.streaming).toBe(false)
+    const body = mockedStream.mock.calls[1][1] as { force_recipe?: boolean }
+    expect(body.force_recipe).toBe(true)
+  })
+
+  it('forceRecipe no hace nada si el último mensaje ya tiene receta', async () => {
+    mockedStream.mockReturnValue(genStream())
+    const store = useChatStore()
+    await store.send('hola')
+    await store.forceRecipe()
+    expect(mockedStream).toHaveBeenCalledTimes(1)
+  })
+
+  it('forceRecipe no hace nada si el último mensaje es del usuario', async () => {
+    mockedStream.mockReturnValue(textOnlyStream())
+    const store = useChatStore()
+    await store.send('hola')
+    store.messages.push({
+      id: 99,
+      role: 'user',
+      content: '¿y la receta?',
+      recipe: null,
+      imageUrl: null,
+      imagePending: false,
+      toolStatus: null,
+      error: null,
+    })
+    await store.forceRecipe()
+    expect(mockedStream).toHaveBeenCalledTimes(1)
+  })
+
+  it('forceRecipe no hace nada sin contenido en el último mensaje', async () => {
+    const store = useChatStore()
+    store.messages.push({
+      id: 1,
+      role: 'assistant',
+      content: '',
+      recipe: null,
+      imageUrl: null,
+      imagePending: false,
+      toolStatus: null,
+      error: null,
+    })
+    await store.forceRecipe()
+    expect(mockedStream).not.toHaveBeenCalled()
+  })
+
+  it('forceRecipe guarda el error cuando el stream falla', async () => {
+    mockedStream.mockReturnValueOnce(textOnlyStream())
+    const store = useChatStore()
+    await store.send('hola')
+    mockedStream.mockReturnValueOnce(
+      (async function* () {
+        throw new Error('conexión perdida')
+      })(),
+    )
+    await store.forceRecipe()
+    expect(store.messages[1].error).toBe('conexión perdida')
+    expect(store.streaming).toBe(false)
+  })
+
+  it('forceRecipe aplica el evento error del backend', async () => {
+    mockedStream.mockReturnValueOnce(textOnlyStream())
+    const store = useChatStore()
+    await store.send('hola')
+    mockedStream.mockReturnValueOnce(
+      (async function* () {
+        yield { event: 'error', data: { message: 'cuota agotada' } }
+      })(),
+    )
+    await store.forceRecipe()
+    expect(store.messages[1].error).toBe('cuota agotada')
+  })
+
+  it('forceRecipe muestra error si el turno no devuelve receta', async () => {
+    mockedStream.mockReturnValueOnce(textOnlyStream())
+    const store = useChatStore()
+    await store.send('hola')
+    mockedStream.mockReturnValueOnce(
+      (async function* () {
+        yield { event: 'done', data: { message: '' } }
+      })(),
+    )
+    await store.forceRecipe()
+    expect(store.messages[1].error).toContain('No pude convertir')
   })
 })

@@ -97,3 +97,4 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
+    force_recipe: bool = False

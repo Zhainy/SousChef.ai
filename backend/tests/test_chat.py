@@ -412,7 +412,7 @@ def test_stream_chat_local_provider(monkeypatch, patched_tools):
     from app.agent.llm import TurnEvent
     from app.schemas import ChatMessage
 
-    async def fake_local_stream(messages):
+    async def fake_local_stream(messages, force_recipe=False):
         yield TurnEvent("token", "Hola local!")
         yield TurnEvent("text", "Hola local!")
 
@@ -426,3 +426,134 @@ def test_stream_chat_local_provider(monkeypatch, patched_tools):
     assert [e.event for e in events] == ["token", "done"]
     assert "".join(e.data["delta"] for e in events if e.event == "token") == "Hola local!"
     assert next(e for e in events if e.event == "done").data["message"] == "Hola local!"
+
+
+def test_local_stream_force_recipe_injects_hint_in_system():
+    import asyncio
+
+    import httpx
+
+    from app.agent.llm import FORCE_RECIPE_HINT, local_stream
+
+    body = _llama_body(
+        _llama_content(f"Claro, aquí está:\n```json\n{RECIPE_JSON}\n```"),
+        _llama_stop("stop"),
+    )
+    seen: list[dict] = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        seen.append(payload)
+        return httpx.Response(200, content=body)
+
+    async def _collect():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return [e async for e in local_stream([], client=http, force_recipe=True)]
+
+    events = asyncio.run(_collect())
+    system = seen[0]["messages"][0]
+    assert system["role"] == "system"
+    assert FORCE_RECIPE_HINT in system["content"]
+    assert events[-1].kind == "text"
+    assert "```json" in events[-1].data
+
+
+def test_local_stream_without_force_recipe_omits_hint():
+    import asyncio
+
+    import httpx
+
+    from app.agent.llm import FORCE_RECIPE_HINT, local_stream
+
+    body = _llama_body(_llama_content("Hola"), _llama_stop("stop"))
+    seen: list[dict] = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        seen.append(payload)
+        return httpx.Response(200, content=body)
+
+    async def _collect():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            return [e async for e in local_stream([], client=http)]
+
+    asyncio.run(_collect())
+    assert FORCE_RECIPE_HINT not in seen[0]["messages"][0]["content"]
+
+
+class _RecordingClient:
+    """Gemini fake que captura los configs de cada llamada al modelo."""
+
+    def __init__(self, turns):
+        self.configs = []
+
+        class _Models(FakeModels):
+            def __init__(self, turns, configs):
+                super().__init__(turns)
+                self._configs = configs
+
+            async def generate_content_stream(self, *, model, contents, config):
+                self._configs.append(config)
+                return await super().generate_content_stream(
+                    model=model, contents=contents, config=config
+                )
+
+        class _Aio:
+            def __init__(self, models):
+                self.models = models
+
+        self.aio = _Aio(_Models(turns, self.configs))
+
+
+def test_gemini_force_recipe_injects_hint_and_emits_recipe(monkeypatch):
+    import asyncio
+
+    from app.agent import agent as agent_mod
+    from app.agent.llm import FORCE_RECIPE_HINT
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
+
+    client = _RecordingClient(
+        [FakeGen([_text_chunk(f"Aquí tienes.\n```json\n{RECIPE_JSON}\n```")])]
+    )
+
+    async def _collect():
+        return [e async for e in stream_chat([], client=client, force_recipe=True)]
+
+    events = asyncio.run(_collect())
+    assert FORCE_RECIPE_HINT in client.configs[0].system_instruction
+    recipe = next(e for e in events if e.event == "recipe")
+    assert recipe.data["nombre"] == "Arroz con tomate"
+
+
+def test_gemini_without_force_recipe_omits_hint(monkeypatch):
+    import asyncio
+
+    from app.agent import agent as agent_mod
+    from app.agent.llm import FORCE_RECIPE_HINT
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
+
+    client = _RecordingClient([FakeGen([_text_chunk("Solo texto.")])])
+
+    async def _collect():
+        return [e async for e in stream_chat([], client=client)]
+
+    asyncio.run(_collect())
+    assert FORCE_RECIPE_HINT not in client.configs[0].system_instruction
+
+
+def test_chat_endpoint_accepts_force_recipe(client, monkeypatch):
+    from app.agent import agent as agent_mod
+    from app.agent import llm as llm_mod
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
+
+    fake = FakeClient([FakeGen([_text_chunk(f"Receta.\n```json\n{RECIPE_JSON}\n```")])])
+    monkeypatch.setattr(llm_mod.genai, "Client", lambda *a, **k: fake)
+    monkeypatch.setattr(llm_mod.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(llm_mod.settings, "llm_provider", "gemini")
+    res = client.post("/api/chat", json={"messages": [], "force_recipe": True})
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/event-stream")
+    assert "event: recipe" in res.text

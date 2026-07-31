@@ -1,10 +1,29 @@
 <script setup lang="ts">
-import type { ChatEntry } from '../../stores/chat'
+import { computed } from 'vue'
+import { useChatStore, type ChatEntry } from '../../stores/chat'
 import AppLoader from '../../components/ui/AppLoader.vue'
 import RecipeCard from './RecipeCard.vue'
 import TypingIndicator from './TypingIndicator.vue'
 
-defineProps<{ entry: ChatEntry; pending?: boolean }>()
+const props = defineProps<{ entry: ChatEntry; pending?: boolean }>()
+
+const store = useChatStore()
+
+const isLast = computed(() => {
+  const last = store.messages[store.messages.length - 1]
+  return last?.id === props.entry.id
+})
+
+const canAskRecipe = computed(
+  () =>
+    isLast.value &&
+    props.entry.role === 'assistant' &&
+    !!props.entry.content &&
+    !props.entry.recipe &&
+    !props.entry.error,
+)
+
+const askingRecipe = computed(() => canAskRecipe.value && store.streaming)
 </script>
 
 <template>
@@ -36,6 +55,30 @@ defineProps<{ entry: ChatEntry; pending?: boolean }>()
         :image-pending="entry.imagePending"
         class="mt-2"
       />
+      <button
+        v-if="canAskRecipe && !askingRecipe"
+        data-test="ask-recipe"
+        class="mt-2 flex items-center gap-1.5 rounded-full border border-basil-200 bg-basil-50 px-3.5 py-1.5 text-sm font-semibold text-basil-700 transition hover:border-saffron-400 hover:text-saffron-700"
+        @click="store.forceRecipe()"
+      >
+        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor" aria-hidden="true">
+          <path
+            d="M8 1.5 9.4 6l4.6 1.5L9.4 9 8 13.5 6.6 9 2 7.5 6.6 6z"
+          />
+          <path
+            d="M15.5 11.5l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7z"
+          />
+        </svg>
+        Obtener la receta
+      </button>
+      <span
+        v-else-if="askingRecipe"
+        data-test="asking-recipe"
+        class="mt-2 flex items-center gap-2 text-sm font-medium italic text-basil-700"
+      >
+        <AppLoader size="sm" tone="saffron" role="progress" />
+        Obteniendo receta…
+      </span>
       <p v-if="entry.error" class="mt-2 text-sm text-tomato-600">{{ entry.error }}</p>
     </div>
   </div>

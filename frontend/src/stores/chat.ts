@@ -110,9 +110,46 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function forceRecipe(): Promise<void> {
+    const last = messages.value[messages.value.length - 1]
+    if (
+      !last ||
+      last.role !== 'assistant' ||
+      !last.content ||
+      last.recipe ||
+      last.error ||
+      streaming.value
+    )
+      return
+    streaming.value = true
+    const history = messages.value
+      .filter((m) => m.content.length > 0)
+      .map((m) => ({ role: m.role, content: m.content }))
+    try {
+      for await (const ev of postSseStream('/api/chat', { messages: history, force_recipe: true })) {
+        if (ev.event === 'recipe') {
+          last.recipe = ev.data as Recipe
+          last.imagePending = true
+        } else if (ev.event === 'recipe_image') {
+          last.imagePending = false
+          last.imageUrl = (ev.data as { image_url: string | null }).image_url
+        } else if (ev.event === 'error') {
+          last.error = (ev.data as { message: string }).message
+        }
+      }
+      if (!last.recipe && !last.error) {
+        last.error = 'No pude convertir la respuesta en una receta. Inténtalo de nuevo.'
+      }
+    } catch (e) {
+      last.error = e instanceof Error ? e.message : 'Error de conexión'
+    } finally {
+      streaming.value = false
+    }
+  }
+
   function clear(): void {
     messages.value = []
   }
 
-  return { messages, streaming, send, clear }
+  return { messages, streaming, send, forceRecipe, clear }
 })

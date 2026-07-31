@@ -73,6 +73,7 @@ def _visible_limit(text: str) -> int:
 async def stream_chat(
     messages: list[ChatMessage],
     client=None,
+    force_recipe: bool = False,
 ) -> AsyncIterable[ServerSentEvent]:
     """Stream del agente. `client` fuerza el proveedor Gemini (usado en tests)."""
     if client is not None or settings.llm_provider == "gemini":
@@ -82,9 +83,9 @@ async def stream_chat(
                 event="error",
             )
             return
-        events = gemini_stream(messages, client=client)
+        events = gemini_stream(messages, client=client, force_recipe=force_recipe)
     else:
-        events = local_stream(messages)
+        events = local_stream(messages, force_recipe=force_recipe)
 
     text = ""
     emitted = 0

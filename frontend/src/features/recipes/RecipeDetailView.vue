@@ -9,6 +9,10 @@ const router = useRouter()
 const store = useRecipesStore()
 
 const saved = computed(() => store.getByHash(String(route.params.hash)))
+
+function onDiscard(): void {
+  router.back()
+}
 </script>
 
 <template>
@@ -47,6 +51,7 @@ const saved = computed(() => store.getByHash(String(route.params.hash)))
       :image-pending="false"
       :show-cook="true"
       class="mx-auto w-full max-w-xl"
+      @discard="onDiscard"
     />
   </div>
 </template>

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import RecipeCard from './RecipeCard.vue'
 import { useRecipesStore } from '../../stores/recipes'
+import { useToastsStore } from '../../stores/toasts'
 import { ApiError, cookRecipe } from '../../lib/api'
 
 vi.mock('../../lib/api', async (importOriginal) => {
@@ -85,6 +87,31 @@ describe('RecipeCard', () => {
     const store = useRecipesStore()
     expect(store.getByHash('abc123')?.favorited).toBe(true)
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('el botón descartar elimina la receta, emite discard y muestra toast', async () => {
+    const wrapper = mountCard()
+    await wrapper.find('[data-test="discard"]').trigger('click')
+    const store = useRecipesStore()
+    expect(store.getByHash('abc123')).toBeUndefined()
+    expect(wrapper.emitted('discard')?.[0]).toEqual(['abc123'])
+    expect(wrapper.find('[data-test="card"]').isVisible()).toBe(false)
+    expect(push).not.toHaveBeenCalled()
+    const toasts = useToastsStore()
+    expect(toasts.toasts[0].message).toBe('Receta descartada')
+    expect(toasts.toasts[0].action?.label).toBe('Deshacer')
+  })
+
+  it('Deshacer restaura la receta y vuelve a mostrar la card', async () => {
+    const wrapper = mountCard()
+    await wrapper.find('[data-test="discard"]').trigger('click')
+    const toasts = useToastsStore()
+    toasts.toasts[0].action!.onClick()
+    await nextTick()
+    const store = useRecipesStore()
+    expect(store.getByHash('abc123')).toBeDefined()
+    expect(store.getByHash('abc123')?.favorited).toBe(false)
+    expect(wrapper.find('[data-test="card"]').isVisible()).toBe(true)
   })
 
   it('muestra las instrucciones como lista numerada', async () => {

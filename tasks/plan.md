@@ -13,6 +13,8 @@
 - **Fase 8 — Unidades por envase y gramos** (completada): `gramos_por_unidad` en Ingredient + migración idempotente, conversión unit-aware en `descontar_stock`, UI + tests.
 - **Fase 9 — Vista de recetas** (completada): `stores/recipes.ts` en localStorage, `RecipesView`/`RecipeDetailView`, botones Ver receta / corazón / Cocinar, toasts y AppModal. Spec en `specs/recetas.md`.
 - **Fase 10 — Robustez del chat e imágenes** (completada): markdown sanitizado (`marked` + `dompurify`), recorte de la cerca ``` en el streaming, `normalize_recipe()` + `/cook` tolerante (400), resaltado del nombre del plato en basil-700, imagen con fallback web (TheMealDB → Wikimedia Commons) vía `IMAGE_SOURCE`.
+- **Fase 11 — Descartar recetas** (completada): botón papelera en `RecipeCard` (neutro → `tomato` en hover) en chat/lista/detalle; `remove(hash)` + `restore(entry)` en `stores/recipes.ts`; toast con acción **"Deshacer"** (`ToastStack`); la card se oculta con `v-show` (el chat no cambia) y `RecipeDetailView` vuelve atrás al descartar. Spec en `specs/descartar-recetas.md`.
+- **Fase 12 — Obtener la receta** (completada): si el último mensaje del asistente es solo texto (sin receta ni error), `ChatMessage` muestra **"Obtener la receta"**; `forceRecipe()` re-emite la historia con `force_recipe: true` y aplica la card al mismo mensaje (sin burbujas nuevas). Backend: `ChatRequest.force_recipe` + hint `FORCE_RECIPE_HINT` en el system prompt (local/Gemini). Spec en `specs/obtener-receta.md`.
 
 ## Dependencias
 ```

@@ -115,4 +115,41 @@ describe('useRecipesStore', () => {
     const store = useRecipesStore()
     expect(store.saved.map((r) => r.hash)).toEqual(['fav-vieja', 'reciente'])
   })
+
+  it('remove elimina, persiste y devuelve la entrada', () => {
+    const store = useRecipesStore()
+    store.save(recipe('h1'), null)
+    const removed = store.remove('h1')
+    expect(removed?.hash).toBe('h1')
+    expect(store.getByHash('h1')).toBeUndefined()
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    expect(raw).toHaveLength(0)
+  })
+
+  it('remove devuelve undefined con hash inexistente', () => {
+    const store = useRecipesStore()
+    expect(store.remove('nope')).toBeUndefined()
+  })
+
+  it('restore re-inserta preservando favorited, cookedAt y createdAt', () => {
+    const store = useRecipesStore()
+    store.save(recipe('h1'), null)
+    store.toggleFavorite('h1')
+    store.markCooked('h1')
+    const entry = store.remove('h1')!
+    expect(entry.favorited).toBe(true)
+    store.restore(entry)
+    const s = store.getByHash('h1')!
+    expect(s.favorited).toBe(true)
+    expect(s.cookedAt).not.toBeNull()
+    expect(s.createdAt).toBe(entry.createdAt)
+    expect(store.saved).toHaveLength(1)
+  })
+
+  it('restore no duplica si el hash ya existe', () => {
+    const store = useRecipesStore()
+    store.save(recipe('h1'), null)
+    store.restore(store.getByHash('h1')!)
+    expect(store.saved).toHaveLength(1)
+  })
 })

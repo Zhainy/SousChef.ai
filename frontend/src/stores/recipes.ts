@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import type { Recipe, SavedRecipe } from '../types'
 
 const STORAGE_KEY = 'souschef.recipes.v1'
@@ -95,6 +95,20 @@ export const useRecipesStore = defineStore('recipes', () => {
     persist()
   }
 
+  function remove(hash: string): SavedRecipe | undefined {
+    const idx = findIndex(hash)
+    if (idx === -1) return undefined
+    const [removed] = saved.value.splice(idx, 1)
+    persist()
+    return removed
+  }
+
+  function restore(entry: SavedRecipe): void {
+    if (findIndex(entry.hash) !== -1) return
+    saved.value.push(entry)
+    persist()
+  }
+
   function getByHash(hash: string): SavedRecipe | undefined {
     return saved.value.find((r) => r.hash === hash)
   }
@@ -122,9 +136,15 @@ export const useRecipesStore = defineStore('recipes', () => {
     updateImage,
     toggleFavorite,
     markCooked,
+    remove,
+    restore,
     getByHash,
     generadasHoy,
     favoritas,
     delDia,
   }
 })
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useRecipesStore, import.meta.hot))
+}

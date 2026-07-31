@@ -14,7 +14,7 @@ const suggestions = [
   '¿Qué merienda saludable puedo hacer?',
 ]
 
-const thinking = computed(() => {
+const awaiting = computed(() => {
   const last = store.messages[store.messages.length - 1]
   return (
     store.streaming &&
@@ -25,6 +25,8 @@ const thinking = computed(() => {
     !last.error
   )
 })
+
+const thinking = computed(() => awaiting.value && store.messages.length <= 2)
 
 function scrollToBottom(): void {
   nextTick(() => {
@@ -106,7 +108,7 @@ async function send(content: string): Promise<void> {
           v-for="(entry, index) in store.messages"
           :key="entry.id"
           :entry="entry"
-          :pending="index === store.messages.length - 1 && thinking"
+          :pending="index === store.messages.length - 1 && awaiting"
         />
       </TransitionGroup>
 

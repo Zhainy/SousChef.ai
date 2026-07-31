@@ -60,3 +60,18 @@
 - [x] /cook tolerante: normalize_recipe() + payload dict → 400; mensaje amigable ante 422 en la card
 - [x] Imagen con fallback web: IMAGE_SOURCE (auto/gemini/web), TheMealDB (tier free) → Wikimedia Commons
 - [x] Test: test_image_service.py; 38 tests backend + 50 frontend
+
+## Fase 11 — Descartar recetas
+- [x] stores/recipes.ts: remove(hash) (retorna la entrada) + restore(entry)
+- [x] Toasts con acción "Deshacer": stores/toasts.ts + ToastStack.vue
+- [x] RecipeCard: botón papelera (neutro → tomato en hover), oculta la card (v-show) y emite discard
+- [x] RecipeDetailView: router.back() al descartar
+- [x] Tests: recipes store (remove/restore), RecipeCard (descartar + undo), ToastStack (acción)
+- [x] specs/descartar-recetas.md; type-check + 59 tests frontend en verde
+
+## Fase 12 — Obtener la receta (respuesta solo texto)
+- [x] Backend: ChatRequest.force_recipe + hint FORCE_RECIPE_HINT en llm.py (local/Gemini) + stream_chat/chat.py
+- [x] Frontend: forceRecipe() en stores/chat.ts (re-emite historia, aplica la card al mismo mensaje)
+- [x] ChatMessage: botón "Obtener la receta" (solo último mensaje texto-sin-receta) + estado "Obteniendo receta…"
+- [x] Tests: backend (hint local/Gemini, evento recipe, endpoint con flag) + frontend (chat store, ChatMessage)
+- [x] specs/obtener-receta.md; ruff + 43 pytest + type-check + 73 tests frontend en verde

@@ -3,10 +3,16 @@ import { defineStore } from 'pinia'
 
 export type ToastType = 'success' | 'error' | 'info'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 export interface Toast {
   id: number
   type: ToastType
   message: string
+  action?: ToastAction
 }
 
 let nextId = 1
@@ -14,9 +20,14 @@ let nextId = 1
 export const useToastsStore = defineStore('toasts', () => {
   const toasts = ref<Toast[]>([])
 
-  function notify(message: string, type: ToastType = 'info', duration = 6000): void {
+  function notify(
+    message: string,
+    type: ToastType = 'info',
+    duration = 6000,
+    action?: ToastAction,
+  ): void {
     const id = nextId++
-    toasts.value.push({ id, type, message })
+    toasts.value.push({ id, type, message, action })
     window.setTimeout(() => dismiss(id), duration)
   }
 

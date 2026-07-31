@@ -38,7 +38,14 @@ SYSTEM_INSTRUCTION = (
     "   - No inventes ingredientes que no estén en el inventario.\n"
     "4. Solo llama a descontar_stock(ingredientes=[...]) cuando el usuario pida "
     "explícitamente cocinar esa receta. Si falta stock, infórmalo amablemente.\n"
-    "5. Responde siempre en español, de forma breve y útil.\n"
+    "    5. Responde siempre en español, de forma breve y útil.\n"
+)
+
+FORCE_RECIPE_HINT = (
+    "\n\n6. El usuario acaba de pedirte la ficha de una receta. Convierte tu respuesta "
+    "anterior al formato de ficha: responde con una presentación breve de 1-2 frases "
+    "seguida del bloque JSON ```json con el esquema indicado. Entrega la receta aunque "
+    "falte algún ingrediente (usa la más cercana con lo disponible)."
 )
 
 TRANSIENT_CODES = {429, 500, 502, 503}
@@ -86,11 +93,13 @@ async def _post_stream(
 async def local_stream(
     history: list[ChatMessage],
     client: httpx.AsyncClient | None = None,
+    force_recipe: bool = False,
 ) -> AsyncIterator[TurnEvent]:
     owns_client = client is None
     http = client or httpx.AsyncClient(timeout=None)
     messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history]
-    messages.insert(0, {"role": "system", "content": SYSTEM_INSTRUCTION})
+    system = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
+    messages.insert(0, {"role": "system", "content": system})
     url = settings.local_llm_base_url.rstrip("/") + "/chat/completions"
     try:
         while True:
@@ -170,9 +179,10 @@ def _build_contents(messages: list[ChatMessage]) -> list[types.Content]:
     return contents
 
 
-def _tool_config() -> types.GenerateContentConfig:
+def _tool_config(force_recipe: bool = False) -> types.GenerateContentConfig:
+    system_instruction = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
     return types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION,
+        system_instruction=system_instruction,
         tools=gemini_tools(),
         tool_config=types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(
@@ -229,10 +239,11 @@ async def _model_turn(
 async def gemini_stream(
     history: list[ChatMessage],
     client: genai.Client | None = None,
+    force_recipe: bool = False,
 ) -> AsyncIterator[TurnEvent]:
     ai = client or genai.Client(api_key=settings.gemini_api_key)
     contents = _build_contents(history)
-    config = _tool_config()
+    config = _tool_config(force_recipe=force_recipe)
 
     while True:
         text = ""

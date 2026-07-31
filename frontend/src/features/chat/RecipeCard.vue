@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { Recipe } from '../../types'
 import { usePantryStore } from '../../stores/pantry'
 import { useRecipesStore } from '../../stores/recipes'
+import { useToastsStore } from '../../stores/toasts'
 import { ApiError, faltantesFromError, type Faltante } from '../../lib/api'
 import AppLoader from '../../components/ui/AppLoader.vue'
 import MarkdownText from '../../components/MarkdownText.vue'
@@ -22,11 +23,15 @@ const props = withDefaults(
   },
 )
 
+const emit = defineEmits<{ discard: [hash: string] }>()
+
 const router = useRouter()
 const store = usePantryStore()
 const recipesStore = useRecipesStore()
+const toasts = useToastsStore()
 const cooking = ref(false)
 const cooked = ref(false)
+const discarded = ref(false)
 const error = ref<string | null>(null)
 const faltantes = ref<Faltante[]>([])
 const showInstructions = ref(false)
@@ -85,6 +90,23 @@ function toggleFavorite(): void {
   }
 }
 
+function discard(): void {
+  const hash = props.recipe.hash
+  if (!hash || discarded.value) return
+  const entry = recipesStore.remove(hash)
+  discarded.value = true
+  emit('discard', hash)
+  if (entry) {
+    toasts.notify('Receta descartada', 'info', 6000, {
+      label: 'Deshacer',
+      onClick: () => {
+        discarded.value = false
+        recipesStore.restore(entry)
+      },
+    })
+  }
+}
+
 async function cook(): Promise<void> {
   if (cooking.value || cooked.value) return
   cooking.value = true
@@ -112,6 +134,7 @@ async function cook(): Promise<void> {
 
 <template>
   <div
+    v-show="!discarded"
     data-test="card"
     class="group overflow-hidden rounded-2xl border border-oat-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-basil-200 hover:shadow-xl hover:shadow-basil-900/10"
     @click="goToDetail"
@@ -194,6 +217,28 @@ async function cook(): Promise<void> {
               <path
                 d="M12 21s-7.5-4.7-10-9C.6 8.6 2.3 5 5.6 5c2 0 3.2 1.1 4.4 3 1.2-1.9 2.4-3 4.4-3 3.3 0 5 3.6 3.6 7-2.5 4.3-10 9-10 9z"
               />
+            </svg>
+          </button>
+          <button
+            data-test="discard"
+            :aria-label="`Descartar ${recipe.nombre}`"
+            class="rounded-full p-1.5 transition hover:bg-tomato-50"
+            @click.stop="discard"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              class="h-5 w-5 text-ink-400 transition-colors hover:text-tomato-600"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M4 6.5h16M9.5 6.5V4.8A.8.8 0 0 1 10.3 4h3.4a.8.8 0 0 1 .8.8v1.7m3.8 0-.7 12a1.6 1.6 0 0 1-1.6 1.5H8a1.6 1.6 0 0 1-1.6-1.5l-.7-12"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path d="M10.5 10.5v6M13.5 10.5v6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
             </svg>
           </button>
         </div>
