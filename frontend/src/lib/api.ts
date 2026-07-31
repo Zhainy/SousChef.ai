@@ -12,6 +12,13 @@ export class ApiError extends Error {
 
   private static messageFromDetail(status: number, detail: unknown): string {
     if (typeof detail === 'string') return detail
+    if (Array.isArray(detail)) {
+      const first = detail[0] as { msg?: string; loc?: unknown } | undefined
+      const loc = Array.isArray(first?.loc)
+        ? String(first.loc[first.loc.length - 1])
+        : ''
+      return first?.msg ? `Datos inválidos${loc ? `: ${loc}` : ''}` : `Error ${status}`
+    }
     if (detail && typeof detail === 'object') {
       const inner = (detail as { detail?: unknown }).detail
       if (typeof inner === 'string') return inner

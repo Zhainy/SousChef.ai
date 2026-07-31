@@ -29,6 +29,33 @@ function newEntry(role: ChatEntry['role'], content = ''): ChatEntry {
   }
 }
 
+function stripRecipeFence(text: string): string {
+  return text.replace(/```[\s\S]*?```/g, '').trim()
+}
+
+function trimRecipeNarrative(text: string): string {
+  const idx = text.search(/Ingredientes:|Ingredients:/i)
+  return idx === -1 ? text : text.slice(0, idx).trim()
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function highlightRecipeName(text: string, name: string): string {
+  const words = name.split(/\s+/).filter(Boolean)
+  for (let len = words.length; len >= 1; len--) {
+    const candidate = words.slice(0, len).join(' ')
+    const re = new RegExp(
+      `(\\s|^)\\*{0,2}\\s*(${escapeRegExp(candidate)})(\\s*)\\*{0,2}(?=[\\s.,;:!?¿¡]|$)`,
+      'i',
+    )
+    const match = text.match(re)
+    if (match) return text.replace(re, `$1**${match[2]}**$3`)
+  }
+  return text
+}
+
 function applyEvent(entry: ChatEntry, ev: SseEvent): void {
   switch (ev.event) {
     case 'token':
@@ -42,6 +69,10 @@ function applyEvent(entry: ChatEntry, ev: SseEvent): void {
       break
     case 'recipe':
       entry.recipe = ev.data as Recipe
+      entry.content = highlightRecipeName(
+        trimRecipeNarrative(stripRecipeFence(entry.content)),
+        entry.recipe.nombre,
+      )
       entry.imagePending = true
       break
     case 'recipe_image':

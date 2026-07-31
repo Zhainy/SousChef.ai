@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { ChatEntry } from '../../stores/chat'
+import AppLoader from '../../components/ui/AppLoader.vue'
+import MarkdownText from '../../components/MarkdownText.vue'
 import RecipeCard from './RecipeCard.vue'
 import TypingIndicator from './TypingIndicator.vue'
 
@@ -14,21 +16,23 @@ defineProps<{ entry: ChatEntry; pending?: boolean }>()
     <div
       :class="
         entry.role === 'user'
-          ? 'rounded-2xl bg-amber-600 text-white'
-          : 'rounded-2xl border border-stone-200 bg-white text-stone-900'
+          ? 'rounded-2xl rounded-br-md bg-gradient-to-br from-basil-700 to-basil-900 text-oat-50 shadow-md shadow-basil-900/25'
+          : 'rounded-2xl rounded-bl-md border border-oat-200 bg-white/85 text-ink-900 shadow-sm backdrop-blur'
       "
-      class="max-w-[85%] px-4 py-3 shadow-sm"
+      class="max-w-[85%] px-4 py-3"
     >
       <p
         v-if="entry.toolStatus"
-        class="mb-1 flex items-center gap-2 text-sm italic opacity-80"
+        class="mb-1 flex items-center gap-2 text-sm font-medium italic text-basil-700"
       >
-        <span
-          class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
-        />
+        <AppLoader size="sm" tone="saffron" role="progress" />
         {{ entry.toolStatus }}
       </p>
-      <p v-if="entry.content" class="whitespace-pre-wrap">{{ entry.content }}</p>
+      <MarkdownText
+        v-if="entry.content && entry.role === 'assistant'"
+        :text="entry.content"
+      />
+      <p v-else-if="entry.content" class="whitespace-pre-wrap">{{ entry.content }}</p>
       <TypingIndicator v-else-if="pending" class="py-1" />
       <RecipeCard
         v-if="entry.recipe"
@@ -37,7 +41,7 @@ defineProps<{ entry: ChatEntry; pending?: boolean }>()
         :image-pending="entry.imagePending"
         class="mt-2"
       />
-      <p v-if="entry.error" class="mt-2 text-sm text-red-600">{{ entry.error }}</p>
+      <p v-if="entry.error" class="mt-2 text-sm text-tomato-600">{{ entry.error }}</p>
     </div>
   </div>
 </template>

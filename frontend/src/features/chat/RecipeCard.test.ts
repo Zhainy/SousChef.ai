@@ -124,6 +124,16 @@ describe('RecipeCard', () => {
     expect(store.getByHash('abc123')?.cookedAt).not.toBeNull()
   })
 
+  it('muestra mensaje amigable ante un 422', async () => {
+    mockedCook.mockRejectedValue(
+      new ApiError(422, [{ msg: 'Input should be greater than or equal to 1' }]),
+    )
+    const wrapper = mountCard({ showCook: true })
+    await wrapper.find('[data-test="cook"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('La receta tiene datos inválidos')
+  })
+
   it('muestra los faltantes ante un 409', async () => {
     mockedCook.mockRejectedValue(
       new ApiError(409, {

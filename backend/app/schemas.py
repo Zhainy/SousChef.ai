@@ -37,6 +37,59 @@ class StockResult(BaseModel):
     faltantes: list[dict]
 
 
+def normalize_recipe(data: dict) -> Recipe | None:
+    """Coacciona la salida del LLM a un Recipe válido, descartando campos inválidos."""
+    nombre = str(data.get("nombre") or "").strip()
+    if not nombre:
+        return None
+
+    ingredientes: list[RecipeIngredient] = []
+    for ing in data.get("ingredientes") or []:
+        if not isinstance(ing, dict):
+            continue
+        name = str(ing.get("nombre") or "").strip()
+        if not name:
+            continue
+        try:
+            cantidad = float(ing.get("cantidad"))
+        except (TypeError, ValueError):
+            continue
+        if cantidad <= 0:
+            continue
+        unidad = ing.get("unidad")
+        unidad = unidad.strip() if isinstance(unidad, str) and unidad.strip() else None
+        ingredientes.append(
+            RecipeIngredient(
+                nombre=name[:120],
+                cantidad=cantidad,
+                unidad=unidad[:40] if unidad else None,
+            )
+        )
+    if not ingredientes:
+        return None
+
+    resumen = data.get("resumen")
+    resumen = resumen.strip() if isinstance(resumen, str) and resumen.strip() else None
+    try:
+        tiempo = int(data.get("tiempo_minutos"))
+    except (TypeError, ValueError):
+        tiempo = None
+    if tiempo is not None and not 1 <= tiempo <= 1440:
+        tiempo = None
+    instrucciones = data.get("instrucciones")
+    instrucciones = (
+        instrucciones.strip() if isinstance(instrucciones, str) and instrucciones.strip() else None
+    )
+
+    return Recipe(
+        nombre=nombre[:160],
+        resumen=resumen,
+        tiempo_minutos=tiempo,
+        ingredientes=ingredientes,
+        instrucciones=instrucciones,
+    )
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str

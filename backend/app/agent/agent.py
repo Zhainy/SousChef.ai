@@ -7,9 +7,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.sse import ServerSentEvent
 
 from ..config import settings
-from ..schemas import ChatMessage
+from ..schemas import ChatMessage, normalize_recipe
 from .image_service import generate_recipe_image
-from .llm import RECIPE_FENCE, gemini_stream, local_stream
+from .llm import gemini_stream, local_stream
 
 
 def _extract_recipe(text: str) -> dict | None:
@@ -21,13 +21,10 @@ def _extract_recipe(text: str) -> dict | None:
         data = json.loads(candidate)
     except json.JSONDecodeError:
         return None
-    if (
-        not isinstance(data, dict)
-        or not data.get("nombre")
-        or not isinstance(data.get("ingredientes"), list)
-    ):
+    if not isinstance(data, dict):
         return None
-    return data
+    recipe = normalize_recipe(data)
+    return recipe.model_dump() if recipe is not None else None
 
 
 def _last_json_object(text: str) -> str | None:
@@ -67,6 +64,12 @@ def _recipe_hash(recipe: dict) -> str:
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
 
 
+def _visible_limit(text: str) -> int:
+    """Índice donde empieza el JSON de la receta (fence ```), o el final del texto."""
+    fence = text.find("```")
+    return len(text) if fence == -1 else fence
+
+
 async def stream_chat(
     messages: list[ChatMessage],
     client=None,
@@ -84,10 +87,16 @@ async def stream_chat(
         events = local_stream(messages)
 
     text = ""
+    emitted = 0
     try:
         async for event in events:
             if event.kind == "token":
-                yield ServerSentEvent(data={"delta": event.data}, event="token")
+                text += event.data
+                limit = _visible_limit(text)
+                delta = text[emitted:limit]
+                emitted = limit
+                if delta:
+                    yield ServerSentEvent(data={"delta": delta}, event="token")
             elif event.kind == "tool_call":
                 yield ServerSentEvent(
                     data={"name": event.data["name"], "args": event.data["args"]},
@@ -113,7 +122,7 @@ async def stream_chat(
                 data={"hash": recipe_hash, "image_url": image_url},
                 event="recipe_image",
             )
-        final_text = text[: text.index(RECIPE_FENCE)] if RECIPE_FENCE in text else text
+        final_text = text[: _visible_limit(text)]
         yield ServerSentEvent(data={"message": final_text}, event="done")
     except Exception as exc:  # noqa: BLE001
         yield ServerSentEvent(data={"message": str(exc)}, event="error")

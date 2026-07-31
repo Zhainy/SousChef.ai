@@ -54,6 +54,102 @@ describe('useChatStore', () => {
     expect(store.streaming).toBe(false)
   })
 
+  it('oculta el bloque JSON de la receta del mensaje', async () => {
+    const withFence = [
+      ...events().filter((e) => e.event === 'token'),
+      {
+        event: 'recipe',
+        data: {
+          nombre: 'Pollo al limón',
+          ingredientes: [{ nombre: 'pollo', cantidad: 300 }],
+          hash: 'abc123',
+          image_url: null,
+        },
+      },
+      { event: 'recipe_image', data: { hash: 'abc123', image_url: null } },
+    ]
+    withFence[1] = {
+      event: 'token',
+      data: { delta: '\n```json\n{"nombre": "Pollo"}\n```' },
+    }
+    async function* gen() {
+      for (const ev of withFence) yield ev
+    }
+    mockedStream.mockReturnValue(gen())
+    const store = useChatStore()
+    await store.send('hola')
+    expect(store.messages[1].content).not.toContain('```json')
+    expect(store.messages[1].content).toBe('Hola')
+  })
+
+  it('recorta la narrativa redundante cuando hay receta', async () => {
+    const narrative = [
+      ...events().filter((e) => e.event !== 'recipe_image' && e.event !== 'done'),
+    ]
+    narrative[2] = {
+      ...narrative[2],
+      data: { delta: 'Te sugiero esta receta:\n\nPasta con atún\n\nIngredientes:\n' },
+    }
+    narrative[3] = { ...narrative[3], data: { delta: '200 g pasta\nInstrucciones:\n...' } }
+    async function* gen() {
+      for (const ev of narrative) yield ev
+    }
+    mockedStream.mockReturnValue(gen())
+    const store = useChatStore()
+    await store.send('hola')
+    expect(store.messages[1].recipe?.nombre).toBe('Pollo al limón')
+    expect(store.messages[1].content).toBe('Te sugiero esta receta:\n\nPasta con atún')
+    expect(store.messages[1].content).not.toContain('200 g pasta')
+  })
+
+  it('resalta el nombre de la receta en negritas', async () => {
+    const withRecipe = [
+      ...events().filter((e) => e.event !== 'recipe_image' && e.event !== 'done'),
+    ]
+    withRecipe[2] = { ...withRecipe[2], data: { delta: 'Hoy te sugiero hacer ' } }
+    withRecipe[3] = { ...withRecipe[3], data: { delta: 'Pollo al limón, es rápido' } }
+    async function* gen() {
+      for (const ev of withRecipe) yield ev
+    }
+    mockedStream.mockReturnValue(gen())
+    const store = useChatStore()
+    await store.send('hola')
+    expect(store.messages[1].content).toBe('Hoy te sugiero hacer **Pollo al limón**, es rápido')
+  })
+
+  it('resalta el nombre aunque la intro no coincida exacto', async () => {
+    const withRecipe = [
+      ...events().filter((e) => e.event !== 'recipe_image' && e.event !== 'done'),
+    ]
+    withRecipe[2] = {
+      ...withRecipe[2],
+      data: {
+        delta:
+          'Con los ingredientes actuales puedo hacer un budín básico con huevos. Aquí tienes la receta:',
+      },
+    }
+    withRecipe[3] = { ...withRecipe[3], data: { delta: ' ' } }
+    const recipeIdx = withRecipe.findIndex((e) => e.event === 'recipe')
+    withRecipe[recipeIdx] = {
+      ...withRecipe[recipeIdx]!,
+      data: {
+        nombre: 'Budín básico de huevos y queso',
+        ingredientes: [{ nombre: 'huevo', cantidad: 2 }],
+        hash: 'abc123',
+        image_url: null,
+      },
+    }
+    async function* gen() {
+      for (const ev of withRecipe) yield ev
+    }
+    mockedStream.mockReturnValue(gen())
+    const store = useChatStore()
+    await store.send('hola')
+    expect(store.messages[1].content).toBe(
+      'Con los ingredientes actuales puedo hacer un **budín básico** con huevos. Aquí tienes la receta:',
+    )
+  })
+
   it('guarda el error cuando el stream falla', async () => {
     mockedStream.mockReturnValue(
       (async function* () {

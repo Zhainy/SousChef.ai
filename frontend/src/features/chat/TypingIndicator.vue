@@ -1,8 +1,18 @@
 <template>
-  <span class="inline-flex items-center gap-1" role="status" aria-label="Escribiendo">
-    <span class="typing-dot h-1.5 w-1.5 rounded-full bg-stone-400" />
-    <span class="typing-dot h-1.5 w-1.5 rounded-full bg-stone-400" style="animation-delay: 0.15s" />
-    <span class="typing-dot h-1.5 w-1.5 rounded-full bg-stone-400" style="animation-delay: 0.3s" />
+  <span
+    class="inline-flex items-center gap-1"
+    role="status"
+    aria-label="Escribiendo"
+  >
+    <span class="typing-dot h-2 w-2 rounded-full bg-basil-300" />
+    <span
+      class="typing-dot h-2 w-2 rounded-full bg-basil-300"
+      style="animation-delay: 0.15s"
+    />
+    <span
+      class="typing-dot h-2 w-2 rounded-full bg-saffron-400"
+      style="animation-delay: 0.3s"
+    />
   </span>
 </template>
 

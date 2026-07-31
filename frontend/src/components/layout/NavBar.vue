@@ -3,32 +3,47 @@ import { RouterLink } from 'vue-router'
 </script>
 
 <template>
-  <header class="sticky top-0 z-10 border-b border-stone-200 bg-white/80 backdrop-blur">
-    <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-      <RouterLink to="/" class="text-lg font-bold tracking-tight text-amber-700">
-        SousChef<span class="text-stone-400">.ai</span>
+  <header
+    class="sticky top-0 z-20 border-b border-basil-800 bg-basil-950/95 text-oat-50 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] backdrop-blur"
+  >
+    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+      <RouterLink to="/" class="group flex items-center gap-2.5">
+        <span
+          class="flex h-9 w-9 items-center justify-center rounded-xl bg-basil-800 shadow-inner transition-transform duration-300 group-hover:-rotate-6"
+          aria-hidden="true"
+        >
+          <svg viewBox="0 0 32 32" class="h-5 w-5" fill="none">
+            <path d="M6 10h20v2H6z" fill="#e8a33d" opacity=".85" />
+            <path d="M6 12h20c0 5-1.5 8-10 8S6 17 6 12z" fill="#e8a33d" />
+            <path
+              d="M12 5c0-1.5 1-2 1-3.5M18 5c0-1.5 1-2 1-3.5"
+              stroke="#f4c471"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+        <span class="font-display text-xl font-semibold tracking-tight">
+          SousChef<span class="text-saffron-400">.ai</span>
+        </span>
       </RouterLink>
-      <nav class="flex gap-1 rounded-full bg-stone-100 p-1">
+
+      <nav
+        class="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1"
+        aria-label="Navegación principal"
+      >
         <RouterLink
-          to="/"
-          class="rounded-full px-4 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-white"
-          active-class="bg-white text-amber-700 shadow-sm"
+          v-for="link in [
+            { to: '/', label: 'Despensa' },
+            { to: '/chat', label: 'Asistente' },
+            { to: '/recetas', label: 'Recetas' },
+          ]"
+          :key="link.to"
+          :to="link.to"
+          class="rounded-full px-3.5 py-1.5 text-sm font-medium text-oat-100/70 transition-all duration-200 hover:bg-white/10 hover:text-white sm:px-4"
+          active-class="bg-oat-50 !text-basil-900 shadow-sm"
         >
-          Despensa
-        </RouterLink>
-        <RouterLink
-          to="/chat"
-          class="rounded-full px-4 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-white"
-          active-class="bg-white text-amber-700 shadow-sm"
-        >
-          Asistente
-        </RouterLink>
-        <RouterLink
-          to="/recetas"
-          class="rounded-full px-4 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-white"
-          active-class="bg-white text-amber-700 shadow-sm"
-        >
-          Recetas
+          {{ link.label }}
         </RouterLink>
       </nav>
     </div>

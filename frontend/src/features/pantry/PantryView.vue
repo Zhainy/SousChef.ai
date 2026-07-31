@@ -4,9 +4,11 @@ import { usePantryStore } from '../../stores/pantry'
 import { useToastsStore } from '../../stores/toasts'
 import type { Ingredient } from '../../types'
 import AppModal from '../../components/AppModal.vue'
+import AppLoader from '../../components/ui/AppLoader.vue'
 import IngredientFilters from './IngredientFilters.vue'
 import IngredientForm from './IngredientForm.vue'
 import IngredientList from './IngredientList.vue'
+import SkeletonPantry from './SkeletonPantry.vue'
 
 const store = usePantryStore()
 const toasts = useToastsStore()
@@ -80,35 +82,57 @@ async function confirmRemove(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
+  <div class="space-y-5">
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold">Despensa</h1>
-        <p class="text-sm text-stone-500">
-          {{ store.items.length }} ingredientes registrados
+        <p class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-basil-600">
+          <span class="h-px w-6 bg-saffron-500" />
+          Tu despensa
+        </p>
+        <h1 class="font-display mt-1 text-3xl font-semibold text-basil-950 sm:text-4xl">
+          Inventario
+        </h1>
+        <p class="mt-1 text-sm text-ink-500">
+          {{ store.items.length }}
+          {{ store.items.length === 1 ? 'ingrediente' : 'ingredientes' }} registrados
         </p>
       </div>
       <button
-        class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+        class="flex shrink-0 items-center gap-1.5 rounded-full bg-basil-800 px-5 py-2.5 text-sm font-semibold text-oat-50 shadow-lg shadow-basil-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-basil-700 hover:shadow-xl hover:shadow-basil-900/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron-500"
         @click="openCreate"
       >
+        <svg
+          viewBox="0 0 20 20"
+          class="h-4 w-4 transition-transform duration-200 group-hover:rotate-90"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M10 4v12M4 10h12"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
         + Agregar ingrediente
       </button>
     </div>
 
-    <p v-if="store.loading" class="text-sm text-stone-500">Cargando…</p>
-    <p v-if="store.error" class="text-sm text-red-600">{{ store.error }}</p>
+    <SkeletonPantry v-if="store.loading" />
+    <p v-else-if="store.error" class="text-sm text-tomato-600">{{ store.error }}</p>
 
-    <IngredientFilters
-      :categorias="store.categorias"
-      @change="(f) => (filters = f)"
-    />
+    <template v-else>
+      <IngredientFilters
+        :categorias="store.categorias"
+        @change="(f) => (filters = f)"
+      />
 
-    <IngredientList
-      :items="filtered"
-      @edit="openEdit"
-      @remove="askRemove"
-    />
+      <IngredientList
+        :items="filtered"
+        @edit="openEdit"
+        @remove="askRemove"
+      />
+    </template>
 
     <AppModal
       v-if="showForm"
@@ -127,24 +151,28 @@ async function confirmRemove(): Promise<void> {
       title="Eliminar ingrediente"
       @close="confirming = null"
     >
-      <p class="text-stone-700">
-        ¿Eliminar "{{ confirming.nombre }}" de la despensa?
+      <p class="text-ink-700">
+        ¿Eliminar
+        <span class="font-semibold text-tomato-700">"{{ confirming.nombre }}"</span>
+        de la despensa?
       </p>
       <div class="mt-5 flex justify-end gap-2">
         <button
-          class="rounded-xl px-4 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-100"
+          class="rounded-full px-4 py-2 text-sm font-medium text-ink-500 transition hover:bg-oat-100 hover:text-ink-700"
           @click="confirming = null"
         >
           Cancelar
         </button>
         <button
           :disabled="deleting"
-          class="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+          class="flex min-w-32 items-center justify-center gap-2 rounded-full bg-tomato-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-tomato-700 disabled:opacity-60"
           @click="confirmRemove"
         >
-          <span
+          <AppLoader
             v-if="deleting"
-            class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+            size="sm"
+            tone="light"
+            :role="null"
           />
           {{ deleting ? 'Eliminando…' : 'Eliminar' }}
         </button>

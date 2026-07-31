@@ -62,7 +62,38 @@ def test_cook_normalizes_names(client):
 
 def test_cook_requires_ingredients(client):
     res = client.post("/api/recipes/cook", json={"nombre": "Vacio", "ingredientes": []})
-    assert res.status_code == 422
+    assert res.status_code == 400
+    assert "ingredientes" in res.json()["detail"]
+
+
+def test_cook_tolerates_invalid_tiempo_minutos(client):
+    res = _cook(client, [{"nombre": "tomate", "cantidad": 1}])
+    res = client.post(
+        "/api/recipes/cook",
+        json={
+            "nombre": "Pollo al limón",
+            "tiempo_minutos": 0,
+            "ingredientes": [{"nombre": "tomate", "cantidad": 1}],
+        },
+    )
+    assert res.status_code == 200
+
+
+def test_cook_drops_invalid_ingredients(client):
+    res = client.post(
+        "/api/recipes/cook",
+        json={
+            "nombre": "Mix",
+            "ingredientes": [
+                {"nombre": "tomate", "cantidad": 1},
+                {"nombre": "basura", "cantidad": 0},
+                {"nombre": "", "cantidad": 5},
+            ],
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert [d["nombre"] for d in body["descontados"]] == ["tomate"]
 
 
 def test_cook_matches_equivalent_units(client):

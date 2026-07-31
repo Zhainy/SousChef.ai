@@ -23,8 +23,9 @@ SYSTEM_INSTRUCTION = (
     "para conocer el stock real.\n"
     "2. Usa SIEMPRE los nombres de ingrediente exactos que devuelve get_inventario() "
     "y las mismas unidades.\n"
-    "3. Cuando sugieras una receta, además del texto, incluye al final un bloque JSON "
-    "cercado con este esquema:\n"
+    "3. Cuando sugieras una receta, escribe ÚNICAMENTE una presentación breve de 1-2 "
+    "frases. NO repitas en el texto los ingredientes ni las instrucciones: esos detalles "
+    "van solo en el bloque JSON que añades al final, con este esquema:\n"
     "```json\n"
     '{"nombre": "...", "resumen": "...", "tiempo_minutos": 25, "ingredientes": '
     '[{"nombre": "...", "cantidad": 200, "unidad": "g"}], "instrucciones": "1. ...\\n2. ..."}\n'

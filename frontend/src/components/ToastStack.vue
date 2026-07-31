@@ -5,8 +5,14 @@ const store = useToastsStore()
 
 const classes: Record<string, string> = {
   success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  error: 'border-red-200 bg-red-50 text-red-800',
-  info: 'border-stone-200 bg-white text-stone-800',
+  error: 'border-tomato-100 bg-tomato-50 text-tomato-700',
+  info: 'border-oat-200 bg-oat-50 text-ink-700',
+}
+
+const dot: Record<string, string> = {
+  success: 'bg-emerald-500',
+  error: 'bg-tomato-500',
+  info: 'bg-saffron-500',
 }
 </script>
 
@@ -21,15 +27,23 @@ const classes: Record<string, string> = {
         :key="toast.id"
         :class="classes[toast.type]"
         data-test="toast"
-        class="pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-lg"
+        class="pointer-events-auto flex items-center gap-3 rounded-full border px-4 py-2.5 text-sm font-medium shadow-lg"
       >
+        <span :class="dot[toast.type]" class="h-2 w-2 shrink-0 rounded-full" />
         <span>{{ toast.message }}</span>
         <button
           aria-label="Cerrar notificación"
           class="rounded p-1 leading-none opacity-60 transition hover:opacity-100"
           @click="store.dismiss(toast.id)"
         >
-          ✕
+          <svg viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
+            <path
+              d="M4 4l8 8M12 4l-8 8"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
         </button>
       </div>
     </transition-group>
@@ -41,11 +55,11 @@ const classes: Record<string, string> = {
 .toast-leave-active {
   transition:
     opacity 0.25s ease,
-    transform 0.25s ease;
+    transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
 }
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(10px) scale(0.96);
 }
 </style>

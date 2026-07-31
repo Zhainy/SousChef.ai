@@ -52,5 +52,20 @@ def generate_recipe_image(recipe: dict, recipe_hash: str) -> str | None:
         return None
     path = _image_path(recipe_hash)
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.open(BytesIO(part.inline_data.data)).save(path)
+    img = Image.open(BytesIO(part.inline_data.data))
+    img = _crop_16_9(img)
+    img.save(path)
     return image_url_for(recipe_hash)
+
+
+def _crop_16_9(img: Image.Image) -> Image.Image:
+    """Recorta al centro a 16:9 para eliminar bandas negras del generador."""
+    w, h = img.size
+    target = 16 / 9
+    if w / h > target:
+        new_w = int(h * target)
+        left = (w - new_w) // 2
+        return img.crop((left, 0, left + new_w, h))
+    new_h = int(w / target)
+    top = (h - new_h) // 2
+    return img.crop((0, top, w, top + new_h))
