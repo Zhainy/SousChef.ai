@@ -5,6 +5,7 @@ set -euo pipefail
 
 MODEL="${LLAMA_MODEL:-$HOME/models/Qwen3.5-4B-Q4_K_M.gguf}"
 PORT="${LLAMA_PORT:-8080}"
+BUDGET="${LLAMA_REASONING_BUDGET:-1024}"
 
 if [ ! -f "$MODEL" ]; then
     echo "Modelo no encontrado: $MODEL"
@@ -12,4 +13,7 @@ if [ ! -f "$MODEL" ]; then
     exit 1
 fi
 
-exec llama-server -m "$MODEL" -c 8192 --port "$PORT" -ngl 99 "$@"
+# Qwen3.5 es un modelo de razonamiento: con --reasoning off deja de emitir el
+# bloque ```json que el backend espera (ver agent/llm.py SYSTEM_INSTRUCTION).
+exec llama-server -m "$MODEL" -c 8192 --port "$PORT" -ngl 99 \
+    --reasoning on --reasoning-budget "$BUDGET" "$@"
