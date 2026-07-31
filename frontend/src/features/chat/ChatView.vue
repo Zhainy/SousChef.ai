@@ -44,7 +44,7 @@ async function send(content: string): Promise<void> {
 </script>
 
 <template>
-  <div class="mx-auto flex h-[calc(100dvh-11.5rem)] max-w-3xl flex-col gap-4">
+  <div class="mx-auto flex h-[calc(100dvh-11.5rem)] w-full max-w-3xl flex-col gap-4">
     <div ref="listEl" class="chat-scroll relative flex-1 overflow-y-auto pr-1">
       <div v-if="store.messages.length === 0" class="flex h-full flex-col items-center justify-center text-center">
         <div class="animate-float relative mb-6">
