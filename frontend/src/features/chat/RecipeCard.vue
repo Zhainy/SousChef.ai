@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Recipe } from '../../types'
 import { usePantryStore } from '../../stores/pantry'
 import { faltantesFromError } from '../../lib/api'
@@ -16,6 +16,27 @@ const cooked = ref(false)
 const error = ref<string | null>(null)
 const faltantes = ref<{ nombre: string; motivo: string }[]>([])
 const showInstructions = ref(false)
+
+function formatAmount(cantidad: number): string {
+  return Number.isInteger(cantidad) ? String(cantidad) : String(Math.round(cantidad * 100) / 100)
+}
+
+function formatIngredient(ing: { cantidad: number; unidad?: string | null }): string {
+  const cantidad = formatAmount(ing.cantidad)
+  return ing.unidad ? `${cantidad} ${ing.unidad}` : cantidad
+}
+
+const instructionSteps = computed<string[] | null>(() => {
+  const raw = props.recipe.instrucciones ?? ''
+  const lines = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return null
+  const numbered = lines.filter((line) => /^\d+[.)]/.test(line)).length
+  if (numbered < Math.max(2, Math.ceil(lines.length / 2))) return null
+  return lines.map((line) => line.replace(/^\d+[.)]\s*/, ''))
+})
 
 async function cook(): Promise<void> {
   if (cooking.value || cooked.value) return
@@ -87,10 +108,12 @@ async function cook(): Promise<void> {
         <li
           v-for="ing in recipe.ingredientes"
           :key="ing.nombre"
-          class="flex justify-between rounded-lg bg-stone-50 px-2 py-1 text-sm"
+          class="flex justify-between gap-3 rounded-lg bg-stone-50 px-2 py-1 text-sm"
         >
           <span>{{ ing.nombre }}</span>
-          <span class="font-medium text-stone-700">{{ ing.cantidad }}</span>
+          <span class="shrink-0 font-medium text-stone-700">
+            {{ formatIngredient(ing) }}
+          </span>
         </li>
       </ul>
 
@@ -101,7 +124,13 @@ async function cook(): Promise<void> {
         >
           {{ showInstructions ? 'Ocultar instrucciones' : 'Ver instrucciones' }}
         </button>
-        <p v-if="showInstructions" class="mt-2 whitespace-pre-wrap text-sm text-stone-600">
+        <ol
+          v-if="showInstructions && instructionSteps"
+          class="mt-2 list-decimal space-y-1 pl-5 text-sm text-stone-600"
+        >
+          <li v-for="(step, index) in instructionSteps" :key="index">{{ step }}</li>
+        </ol>
+        <p v-else-if="showInstructions" class="mt-2 whitespace-pre-wrap text-sm text-stone-600">
           {{ recipe.instrucciones }}
         </p>
       </div>
@@ -122,9 +151,13 @@ async function cook(): Promise<void> {
       <button
         data-test="cook"
         :disabled="cooking || cooked"
-        class="mt-4 w-full rounded-xl bg-amber-600 px-4 py-2.5 font-medium text-white transition hover:bg-amber-700 disabled:opacity-60"
+        class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 font-medium text-white transition hover:bg-amber-700 disabled:opacity-60"
         @click="cook"
       >
+        <span
+          v-if="cooking"
+          class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+        />
         <span v-if="cooking">Cocinando…</span>
         <span v-else-if="cooked">¡Cocinada!</span>
         <span v-else>Cocinar receta</span>

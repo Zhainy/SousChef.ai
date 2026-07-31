@@ -20,10 +20,10 @@ const recipe = {
   resumen: 'Rápido y fresco',
   tiempo_minutos: 20,
   ingredientes: [
-    { nombre: 'pollo', cantidad: 300 },
-    { nombre: 'limón', cantidad: 1 },
+    { nombre: 'pollo', cantidad: 300, unidad: 'g' },
+    { nombre: 'limón', cantidad: 1, unidad: 'pieza' },
   ],
-  instrucciones: '1. Cocinar.',
+  instrucciones: '1. Cocinar el pollo.\n2. Añadir el limón.',
 }
 
 function mountCard(props: Record<string, unknown> = {}) {
@@ -43,7 +43,18 @@ describe('RecipeCard', () => {
     expect(wrapper.text()).toContain('Pollo al limón')
     expect(wrapper.text()).toContain('~20 min')
     expect(wrapper.text()).toContain('pollo')
-    expect(wrapper.text()).toContain('300')
+    expect(wrapper.text()).toContain('300 g')
+    expect(wrapper.text()).toContain('1 pieza')
+  })
+
+  it('muestra las instrucciones como lista numerada', async () => {
+    const wrapper = mountCard()
+    expect(wrapper.find('ol').exists()).toBe(false)
+    await wrapper.find('button').trigger('click')
+    const steps = wrapper.findAll('ol li')
+    expect(steps).toHaveLength(2)
+    expect(steps[0].text()).toBe('Cocinar el pollo.')
+    expect(steps[1].text()).toBe('Añadir el limón.')
   })
 
   it('muestra spinner mientras se genera la imagen', () => {

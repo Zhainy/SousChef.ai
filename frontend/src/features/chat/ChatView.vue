@@ -28,9 +28,17 @@ async function send(content: string): Promise<void> {
   <div class="flex h-[calc(100vh-10rem)] flex-col gap-4">
     <div ref="listEl" class="flex-1 space-y-4 overflow-y-auto pr-1">
       <ChatMessage
-        v-for="entry in store.messages"
+        v-for="(entry, index) in store.messages"
         :key="entry.id"
         :entry="entry"
+        :pending="
+          store.streaming &&
+          index === store.messages.length - 1 &&
+          entry.role === 'assistant' &&
+          !entry.content &&
+          !entry.recipe &&
+          !entry.error
+        "
       />
       <p
         v-if="store.messages.length === 0"

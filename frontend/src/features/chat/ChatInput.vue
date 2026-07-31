@@ -34,10 +34,14 @@ function onKeydown(e: KeyboardEvent): void {
     />
     <button
       :disabled="disabled || !text.trim()"
-      class="rounded-2xl bg-amber-600 px-5 py-3 font-medium text-white transition hover:bg-amber-700 disabled:opacity-50"
+      class="flex items-center gap-2 rounded-2xl bg-amber-600 px-5 py-3 font-medium text-white transition hover:bg-amber-700 disabled:opacity-50"
       @click="submit"
     >
-      Enviar
+      <span
+        v-if="disabled"
+        class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+      />
+      {{ disabled ? 'Generando…' : 'Enviar' }}
     </button>
   </div>
 </template>

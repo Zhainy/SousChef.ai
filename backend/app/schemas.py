@@ -18,6 +18,7 @@ class IngredientUpdate(BaseModel):
 class RecipeIngredient(BaseModel):
     nombre: str = Field(min_length=1, max_length=120)
     cantidad: float = Field(gt=0)
+    unidad: str | None = None
 
 
 class Recipe(BaseModel):

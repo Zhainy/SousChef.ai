@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ChatEntry } from '../../stores/chat'
 import RecipeCard from './RecipeCard.vue'
+import TypingIndicator from './TypingIndicator.vue'
 
-defineProps<{ entry: ChatEntry }>()
+defineProps<{ entry: ChatEntry; pending?: boolean }>()
 </script>
 
 <template>
@@ -28,6 +29,7 @@ defineProps<{ entry: ChatEntry }>()
         {{ entry.toolStatus }}
       </p>
       <p v-if="entry.content" class="whitespace-pre-wrap">{{ entry.content }}</p>
+      <TypingIndicator v-else-if="pending" class="py-1" />
       <RecipeCard
         v-if="entry.recipe"
         :recipe="entry.recipe"

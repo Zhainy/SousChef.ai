@@ -10,6 +10,7 @@ export interface Ingredient {
 export interface RecipeIngredient {
   nombre: string
   cantidad: number
+  unidad?: string | null
 }
 
 export interface Recipe {
