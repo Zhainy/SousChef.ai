@@ -1,0 +1,50 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - git
+  - ufw
+  - iptables-persistent
+
+runcmd:
+  # Instalar Docker oficial para Ubuntu ARM64
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Configurar usuarios en el grupo docker
+  - usermod -aG docker ubuntu || true
+  - id -u opc &>/dev/null && usermod -aG docker opc || true
+
+  # Configurar firewall de la instancia (Ubuntu en OCI tiene reglas estrictas en iptables por defecto)
+  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  - netfilter-persistent save || true
+  - ufw allow 22/tcp || true
+  - ufw allow 80/tcp || true
+  - ufw allow 443/tcp || true
+
+  # Crear directorios para volúmenes persistentes de SousChef
+  - mkdir -p /opt/souschef/data
+  - mkdir -p /opt/souschef/models
+  - mkdir -p /opt/souschef/certbot/conf
+  - mkdir -p /opt/souschef/certbot/www
+  - chown -R ubuntu:ubuntu /opt/souschef || true
+
+  # Clonar repositorio
+  - |
+    if [ ! -d "/opt/souschef/app/.git" ]; then
+      git clone ${github_repo_url} /opt/souschef/app
+      chown -R ubuntu:ubuntu /opt/souschef/app || true
+    fi
+
+final_message: "SousChef.ai OCI instance initialization complete!"

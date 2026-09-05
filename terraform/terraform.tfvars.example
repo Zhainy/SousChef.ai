@@ -1,0 +1,35 @@
+# ==============================================================================
+# SousChef.ai - Variables de Configuración de OCI para Terraform
+# ==============================================================================
+# Copia este archivo a 'terraform.tfvars' y completa con tus credenciales de OCI.
+# NUNCA subas 'terraform.tfvars' ni archivos .pem a Git.
+# ==============================================================================
+
+# OCID de tu Tenancy (Perfil -> Tenancy: nombre)
+tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# OCID de tu Usuario en OCI (Perfil -> User Settings)
+user_ocid = "ocid1.user.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Fingerprint de tu API Key cargada en OCI (ej: 12:34:56:78:90:ab:cd:ef:...)
+fingerprint = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+
+# Ruta local al archivo PEM de tu clave privada API Key
+private_key_path = "~/.oci/oci_api_key.pem"
+
+# Región donde tienes habilitado OCI Generative AI y Always Free
+region = "us-chicago-1"
+
+# Opcional: OCID de un Compartimento específico (dejar comentado para usar raíz)
+# compartment_id = "ocid1.compartment.oc1..aaaaaaaaxxxxxxxxx"
+
+# Clave SSH pública que se autorizará en la máquina virtual (ej: ~/.ssh/id_rsa.pub)
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... tu_email@ejemplo.com"
+
+# Recursos de cómputo dentro del Always Free (Ampere A1 Flex)
+instance_shape_ocpus     = 2    # OCPUs (máximo 4 gratis en cuenta Always Free)
+instance_shape_memory_gb = 12   # RAM en GB (máximo 24 GB gratis en cuenta Always Free)
+boot_volume_size_in_gbs  = 100  # Disco de arranque en GB (máximo 200 GB gratis)
+
+# Repositorio Git a clonar en la instancia
+github_repo_url = "https://github.com/Zhainy/SousChef.ai.git"

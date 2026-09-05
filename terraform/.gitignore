@@ -1,0 +1,24 @@
+# Archivos de estado y variables locales de Terraform
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Archivos de inicialización y plugins
+.terraform/
+.terraform.lock.hcl
+
+# Logs y volcados
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Llaves y certificados privados
+*.pem
+*.key
