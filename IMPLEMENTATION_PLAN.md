@@ -847,7 +847,7 @@ Docker está instalado y el repo clonado en `/opt/souschef/app`.
 
 ---
 
-### Task 10 — Script `deploy_oci.sh` + documentación en README.md
+### [x] Task 10 — Script `deploy_oci.sh` + documentación en README.md
 
 **Objetivo:** Automatizar los pasos post-Terraform y documentar el flujo completo de despliegue
 en el README para que sea reproducible por cualquier persona desde el repo.
@@ -939,7 +939,7 @@ echo "✓ SousChef.ai desplegado en https://${DOMAIN}"
 
 ---
 
-### Task 11 — Configuración Instance Principal + badge proveedor en frontend + validación E2E
+### [x] Task 11 — Configuración Instance Principal + badge proveedor en frontend + validación E2E
 
 **Objetivo:** Conectar el stack completo a OCI Generative AI con Instance Principal (sin
 secrets en el servidor), agregar indicador visual del proveedor activo en la UI, y validar

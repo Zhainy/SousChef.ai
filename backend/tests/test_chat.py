@@ -213,6 +213,32 @@ def test_oci_stream_missing_compartment_raises_ai_provider_error(monkeypatch):
     assert "OCI_COMPARTMENT_ID" in str(exc_info.value)
 
 
+def test_build_oci_auth_instance_principal(monkeypatch):
+    import sys
+    from unittest.mock import MagicMock
+    from app.agent import llm as llm_mod
+
+    mock_oci_openai = MagicMock()
+    monkeypatch.setitem(sys.modules, "oci_openai", mock_oci_openai)
+    monkeypatch.setattr(llm_mod.settings, "oci_auth_type", "instance_principal")
+
+    llm_mod._build_oci_auth()
+    mock_oci_openai.OciInstancePrincipalAuth.assert_called_once()
+
+
+def test_build_oci_auth_api_key(monkeypatch):
+    import sys
+    from unittest.mock import MagicMock
+    from app.agent import llm as llm_mod
+
+    mock_oci_openai = MagicMock()
+    monkeypatch.setitem(sys.modules, "oci_openai", mock_oci_openai)
+    monkeypatch.setattr(llm_mod.settings, "oci_auth_type", "api_key")
+
+    llm_mod._build_oci_auth()
+    mock_oci_openai.OciUserPrincipalAuth.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # stream_chat & Hybrid AI Fallback tests (Task 3)
 # ---------------------------------------------------------------------------
