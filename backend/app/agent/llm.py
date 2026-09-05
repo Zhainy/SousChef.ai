@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
@@ -10,7 +11,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from ..config import settings
 from ..schemas import ChatMessage
-from .tools import execute_tool, openai_tools
+from .tools import TOOL_DEFS, execute_tool, openai_tools
 
 RECIPE_FENCE = "```json"
 
@@ -42,6 +43,10 @@ SYSTEM_INSTRUCTION = (
     "5. Solo llama a descontar_stock(ingredientes=[...]) cuando el usuario pida "
     "explícitamente cocinar esa receta.\n"
     "6. Responde siempre en español, de forma breve, cálida y útil.\n"
+    "7. IMPORTANTE: Para llamar a una herramienta usa EXCLUSIVAMENTE el mecanismo nativo "
+    "de function calling de la API. NUNCA escribas el JSON de una herramienta como texto "
+    "plano en tu respuesta. Si necesitas llamar a get_inventario o descontar_stock, hazlo "
+    "solo a través del mecanismo de tool_calls de la API.\n"
 )
 
 FORCE_RECIPE_HINT = (
@@ -75,6 +80,41 @@ class AIProviderError(Exception):
 
 def _is_transient(exc: Exception) -> bool:
     return getattr(exc, "code", None) in TRANSIENT_CODES
+
+
+# ---------------------------------------------------------------------------
+# Parser de tool calls escritos como texto plano (fallback para modelos como
+# Llama 3.3 que a veces emiten tool calls como JSON en el content)
+# ---------------------------------------------------------------------------
+
+_TOOL_NAMES = {d["name"] for d in TOOL_DEFS}
+
+# Patrón para detectar un objeto JSON que contenga "name" y "arguments"
+_TEXT_TOOL_RE = re.compile(
+    r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\{\s*\})\s*\}',
+    re.DOTALL,
+)
+
+
+def _extract_text_tool_calls(text: str) -> list[dict[str, Any]]:
+    """Extrae tool calls escritos como texto plano en el contenido.
+
+    Detecta patrones {"name": "...", "arguments": {...}} y los devuelve
+    como lista de dicts con keys 'name' y 'arguments' (str JSON).
+    Solo reconoce herramientas registradas en TOOL_DEFS.
+    """
+    results = []
+    for match in _TEXT_TOOL_RE.finditer(text):
+        name = match.group(1)
+        if name in _TOOL_NAMES:
+            results.append({"name": name, "arguments": match.group(2)})
+    return results
+
+
+def _strip_text_tool_calls(text: str) -> str:
+    """Elimina los JSON de tool calls del texto para no mostrarlos al usuario."""
+    cleaned = _TEXT_TOOL_RE.sub("", text)
+    return re.sub(r'\n{3,}', '\n\n', cleaned).strip()
 
 
 def _emit_text_delta(text: str, emitted: int) -> tuple[str, int]:
@@ -324,6 +364,10 @@ async def oci_stream(
                 emitted = 0
                 calls = {}
                 saw_content = False
+                # Indica si el contenido podría ser un tool call en texto plano
+                # (comienza con '{'); en ese caso buffereamos sin emitir tokens
+                maybe_text_tool = False
+                first_content = True
                 try:
                     response = await client.chat.completions.create(**payload)
                     async for chunk in response:
@@ -336,9 +380,17 @@ async def oci_stream(
                         if content:
                             saw_content = True
                             text += content
-                            partial, emitted = _emit_text_delta(text, emitted)
-                            if partial:
-                                yield TurnEvent("token", partial)
+                            # Al recibir el primer fragmento, decidimos si
+                            # es un posible tool call en texto ({...}) o texto normal
+                            if first_content:
+                                first_content = False
+                                maybe_text_tool = text.lstrip().startswith("{")
+                            # Solo emitir tokens en tiempo real si NO es un posible
+                            # tool call en texto plano
+                            if not maybe_text_tool:
+                                partial, emitted = _emit_text_delta(text, emitted)
+                                if partial:
+                                    yield TurnEvent("token", partial)
 
                         for tool_call in getattr(delta, "tool_calls", None) or []:
                             saw_content = True
@@ -361,25 +413,49 @@ async def oci_stream(
                     await asyncio.sleep(RETRY_DELAY * (attempt + 1))
                     continue
 
+            # --- detectar tool calls escritos como texto plano (fallback Llama 3.3) ---
+            if not calls and text:
+                text_calls = _extract_text_tool_calls(text)
+                if text_calls:
+                    # El modelo escribió el tool call como JSON en el texto;
+                    # procesarlo como si fuera un tool_calls estructurado
+                    for idx, tc in enumerate(text_calls):
+                        calls[idx] = {
+                            "name": tc["name"],
+                            "arguments": tc["arguments"],
+                            "id": f"text_call_{idx}",
+                        }
+                    # No emitir el texto con los JSON crudos; limpiar antes
+                    text = _strip_text_tool_calls(text)
+
+            # --- emitir tokens del texto acumulado (si no son tool calls) ---
+            if not calls and text:
+                partial, emitted = _emit_text_delta(text, emitted)
+                if partial:
+                    yield TurnEvent("token", partial)
+
             # --- resolver tool calls si las hay ---
             if calls:
+                # Construir IDs sintéticos para text-based calls si es necesario
+                tool_calls_list = [
+                    {
+                        "id": call["id"] or f"call_{idx}",
+                        "type": "function",
+                        "function": {
+                            "name": call["name"],
+                            "arguments": call["arguments"],
+                        },
+                    }
+                    for idx, call in sorted(calls.items())
+                ]
                 assistant_msg: dict[str, Any] = {
                     "role": "assistant",
                     "content": text or None,
-                    "tool_calls": [
-                        {
-                            "id": call["id"],
-                            "type": "function",
-                            "function": {
-                                "name": call["name"],
-                                "arguments": call["arguments"],
-                            },
-                        }
-                        for _, call in sorted(calls.items())
-                    ],
+                    "tool_calls": tool_calls_list,
                 }
                 messages.append(assistant_msg)
-                for _, call in sorted(calls.items()):
+                for idx, call in sorted(calls.items()):
+                    call_id = call["id"] or f"call_{idx}"
                     try:
                         args = json.loads(call["arguments"]) if call["arguments"] else {}
                     except json.JSONDecodeError:
@@ -387,7 +463,7 @@ async def oci_stream(
                     yield TurnEvent("tool_call", {"name": call["name"], "args": args})
                     result = await run_in_threadpool(execute_tool, call["name"], args)
                     yield TurnEvent("tool_result", {"name": call["name"], "result": result})
-                    messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
+                    messages.append({"role": "tool", "tool_call_id": call_id, "content": result})
                 continue  # siguiente turno del modelo
 
             yield TurnEvent("text", text)
