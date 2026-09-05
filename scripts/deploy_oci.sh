@@ -87,8 +87,9 @@ if [ "${ACCESS_MODE}" = "1" ]; then
         certbot/certbot certonly --standalone \
         -d "${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}"
 
-    # Crear enlace simbolico para desacoplar el nombre del dominio en Nginx
-    ln -sfn "${SOUSCHEF_DIR}/certbot/conf/live/${DOMAIN}" "${SOUSCHEF_DIR}/certbot/conf/live/souschef-cert"
+    # Crear enlace simbolico relativo para que funcione tanto en host como dentro del contenedor Docker
+    (cd "${SOUSCHEF_DIR}/certbot/conf/live" && ln -sfn "${DOMAIN}" "souschef-cert")
+    chmod -R 755 "${SOUSCHEF_DIR}/certbot/conf/live" "${SOUSCHEF_DIR}/certbot/conf/archive" 2>/dev/null || true
 
     # Actualizar ALLOW_ORIGINS en .env si es necesario
     if grep -q "ALLOW_ORIGINS=" "${APP_DIR}/.env"; then
