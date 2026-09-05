@@ -8,9 +8,8 @@ dependencies = [
     "uvicorn[standard]",
     "sqlmodel",
     "pydantic-settings",
-    "google-genai",
-    "pillow",
     "httpx",
+    "oci-openai==1.1.0",
 ]
 
 [dependency-groups]

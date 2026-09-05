@@ -1,7 +1,6 @@
 import json
 from typing import Any
 
-from google.genai import types
 from sqlmodel import Session, select
 
 from ..db import engine
@@ -48,38 +47,6 @@ TOOL_DEFS: list[dict[str, Any]] = [
 
 def openai_tools() -> list[dict[str, Any]]:
     return [{"type": "function", "function": dict(d)} for d in TOOL_DEFS]
-
-
-def _to_schema(schema: dict[str, Any]) -> types.Schema:
-    mapping = {
-        "object": types.Type.OBJECT,
-        "array": types.Type.ARRAY,
-        "string": types.Type.STRING,
-        "number": types.Type.NUMBER,
-        "integer": types.Type.INTEGER,
-        "boolean": types.Type.BOOLEAN,
-    }
-    return types.Schema(
-        type=mapping.get(schema["type"], types.Type.OBJECT),
-        description=schema.get("description"),
-        properties={
-            name: _to_schema(value) for name, value in schema.get("properties", {}).items()
-        },
-        items=_to_schema(schema["items"]) if "items" in schema else None,
-        required=schema.get("required"),
-    )
-
-
-def gemini_tools() -> list[types.Tool]:
-    declarations = [
-        types.FunctionDeclaration(
-            name=definition["name"],
-            description=definition.get("description", ""),
-            parameters=_to_schema(definition["parameters"]),
-        )
-        for definition in TOOL_DEFS
-    ]
-    return [types.Tool(function_declarations=declarations)]
 
 
 def get_inventario() -> dict[str, Any]:

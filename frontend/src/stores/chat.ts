@@ -12,6 +12,8 @@ export interface ChatEntry {
   imagePending: boolean
   toolStatus: string | null
   error: string | null
+  aiProvider: 'oci' | 'local' | null
+  aiFallback: boolean
 }
 
 let nextId = 1
@@ -26,6 +28,8 @@ function newEntry(role: ChatEntry['role'], content = ''): ChatEntry {
     imagePending: false,
     toolStatus: null,
     error: null,
+    aiProvider: null,
+    aiFallback: false,
   }
 }
 
@@ -79,6 +83,12 @@ function applyEvent(entry: ChatEntry, ev: SseEvent): void {
       entry.imagePending = false
       entry.imageUrl = (ev.data as { image_url: string | null }).image_url
       break
+    case 'provider_info': {
+      const info = ev.data as { provider: 'oci' | 'local'; fallback: boolean }
+      entry.aiProvider = info.provider
+      entry.aiFallback = info.fallback
+      break
+    }
     case 'error':
       entry.error = (ev.data as { message: string }).message
       break

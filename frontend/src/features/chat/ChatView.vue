@@ -28,6 +28,15 @@ const awaiting = computed(() => {
 
 const thinking = computed(() => awaiting.value && store.messages.length <= 2)
 
+// Badge del proveedor de IA: muestra el último proveedor usado por un mensaje del asistente
+const aiProviderBadge = computed(() => {
+  const last = [...store.messages].reverse().find(
+    (m) => m.role === 'assistant' && m.aiProvider !== null,
+  )
+  if (!last) return null
+  return { provider: last.aiProvider, fallback: last.aiFallback }
+})
+
 function scrollToBottom(): void {
   nextTick(() => {
     if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight
@@ -121,6 +130,41 @@ async function send(content: string): Promise<void> {
         </div>
       </Transition>
     </div>
+
+    <!-- Badge proveedor de IA -->
+    <Transition name="badge">
+      <div
+        v-if="aiProviderBadge"
+        class="flex items-center justify-end pr-1"
+        aria-live="polite"
+        aria-label="Proveedor de IA activo"
+      >
+        <span
+          :class="[
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-wide transition-colors duration-300',
+            aiProviderBadge.fallback
+              ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
+              : aiProviderBadge.provider === 'oci'
+                ? 'bg-basil-100 text-basil-700 ring-1 ring-basil-300'
+                : 'bg-oat-100 text-ink-500 ring-1 ring-oat-300',
+          ]"
+        >
+          <span aria-hidden="true">
+            {{ aiProviderBadge.provider === 'oci' ? '✦' : '⚡' }}
+          </span>
+          <span>
+            {{
+              aiProviderBadge.provider === 'oci'
+                ? 'OCI AI'
+                : aiProviderBadge.fallback
+                  ? 'Local AI (fallback)'
+                  : 'Local AI'
+            }}
+          </span>
+        </span>
+      </div>
+    </Transition>
+
     <ChatInput :disabled="store.streaming" @send="send" />
   </div>
 </template>
@@ -175,5 +219,15 @@ async function send(content: string): Promise<void> {
 .thinking-leave-to {
   opacity: 0;
   transform: scale(0.92);
+}
+
+.badge-enter-active,
+.badge-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.badge-enter-from,
+.badge-leave-to {
+  opacity: 0;
+  transform: translateY(4px) scale(0.95);
 }
 </style>

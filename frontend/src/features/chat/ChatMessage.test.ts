@@ -15,6 +15,8 @@ function entry(overrides: Partial<ChatEntry>): ChatEntry {
     imagePending: false,
     toolStatus: null,
     error: null,
+    aiProvider: null,
+    aiFallback: false,
     ...overrides,
   }
 }

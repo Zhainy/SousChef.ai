@@ -6,12 +6,11 @@ from typing import Any
 
 import httpx
 from fastapi.concurrency import run_in_threadpool
-from google import genai
-from google.genai import types
+from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from ..config import settings
 from ..schemas import ChatMessage
-from .tools import execute_tool, gemini_tools, openai_tools
+from .tools import execute_tool, openai_tools
 
 RECIPE_FENCE = "```json"
 
@@ -57,6 +56,17 @@ RETRY_DELAY = 2.0
 class TurnEvent:
     kind: str
     data: Any
+
+
+class AIProviderError(Exception):
+    """Error recuperable de un proveedor de IA.
+    Si se lanza antes de emitir tokens, activa el fallback automático.
+    """
+
+    def __init__(self, provider: str, cause: Exception) -> None:
+        self.provider = provider
+        self.cause = cause
+        super().__init__(f"[{provider}] {cause}")
 
 
 def _is_transient(exc: Exception) -> bool:
@@ -166,119 +176,163 @@ async def local_stream(
             await http.aclose()
 
 
+
 # ---------------------------------------------------------------------------
-# Proveedor Gemini
+# Proveedor OCI Generative AI
 # ---------------------------------------------------------------------------
 
+def _build_oci_auth() -> Any:
+    """Construye el signer correcto según OCI_AUTH_TYPE.
 
-def _build_contents(messages: list[ChatMessage]) -> list[types.Content]:
-    contents: list[types.Content] = []
-    for msg in messages:
-        role = "model" if msg.role == "assistant" else "user"
-        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
-    return contents
+    - "api_key": lee ~/.oci/config (desarrollo local).
+    - "instance_principal": usa el IAM role de la VM OCI (producción).
+    """
+    from oci_openai import OciInstancePrincipalAuth, OciUserPrincipalAuth
+
+    if settings.oci_auth_type == "instance_principal":
+        return OciInstancePrincipalAuth()
+    return OciUserPrincipalAuth()  # default: api_key via ~/.oci/config
 
 
-def _tool_config(force_recipe: bool = False) -> types.GenerateContentConfig:
-    system_instruction = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
-    return types.GenerateContentConfig(
-        system_instruction=system_instruction,
-        tools=gemini_tools(),
-        tool_config=types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(
-                mode=types.FunctionCallingConfigMode.AUTO
-            )
-        ),
-        temperature=0.7,
+def _build_oci_client() -> Any:
+    """Construye el AsyncOciOpenAI con endpoint y autenticación correctos."""
+    from oci_openai import AsyncOciOpenAI
+
+    endpoint = settings.oci_service_endpoint or (
+        f"https://inference.generativeai.{settings.oci_region}.oci.oraclecloud.com"
+    )
+    return AsyncOciOpenAI(
+        auth=_build_oci_auth(),
+        service_endpoint=endpoint,
+        compartment_id=settings.oci_compartment_id,
+        timeout=float(settings.oci_timeout_seconds),
+        max_retries=0,  # gestionamos los reintentos manualmente
     )
 
 
-async def _model_turn(
-    ai: genai.Client,
-    contents: list[types.Content],
-    config: types.GenerateContentConfig,
-) -> AsyncIterator[tuple[str, object]]:
-    """Streams one model turn, retrying transient errors that occur before any output."""
-    for attempt in range(MAX_ATTEMPTS):
-        response = await ai.aio.models.generate_content_stream(
-            model=settings.gemini_model,
-            contents=contents,
-            config=config,
-        )
-        text = ""
-        call_parts: list[types.Part] = []
-        emitted = 0
-        saw_content = False
-        try:
-            async for chunk in response:
-                if not chunk.parts:
-                    continue
-                for part in chunk.parts:
-                    if part.function_call is not None:
-                        saw_content = True
-                        if text:
-                            call_parts.append(types.Part.from_text(text=text))
-                            text = ""
-                        call_parts.append(part)
-                    elif part.text:
-                        saw_content = True
-                        text += part.text
-                        delta, limit = _emit_text_delta(text, emitted)
-                        if delta:
-                            yield ("token", delta)
-                        emitted = limit
-        except Exception as exc:  # noqa: BLE001
-            if saw_content or not _is_transient(exc) or attempt >= MAX_ATTEMPTS - 1:
-                raise
-            await asyncio.sleep(RETRY_DELAY * (attempt + 1))
-            continue
-        yield ("result", (text, call_parts))
-        return
+def _is_oci_transient(exc: Exception) -> bool:
+    """Determina si un error de la API de OCI es transitorio y merece reintento."""
+    if isinstance(exc, APITimeoutError):
+        return True
+    if isinstance(exc, APIStatusError):
+        return exc.status_code in TRANSIENT_CODES
+    return False
 
 
-async def gemini_stream(
+async def oci_stream(
     history: list[ChatMessage],
-    client: genai.Client | None = None,
     force_recipe: bool = False,
 ) -> AsyncIterator[TurnEvent]:
-    ai = client or genai.Client(api_key=settings.gemini_api_key)
-    contents = _build_contents(history)
-    config = _tool_config(force_recipe=force_recipe)
+    """Stream del proveedor OCI Generative AI.
 
-    while True:
-        text = ""
-        call_parts: list[types.Part] = []
-        async for kind, payload in _model_turn(ai, contents, config):
-            if kind == "token":
-                yield TurnEvent("token", payload)
-            else:
-                text, call_parts = payload
+    Usa la API Chat Completions compatible con OpenAI expuesta por OCI.
+    Implementa el mismo contrato de TurnEvent que local_stream():
+      token → tool_call → tool_result → text
+    Lanza AIProviderError en fallos recuperables para activar el fallback.
+    """
+    if not settings.oci_compartment_id:
+        raise AIProviderError(
+            "oci",
+            ValueError("OCI_COMPARTMENT_ID no está configurado en el entorno."),
+        )
 
-        if call_parts:
-            parts = list(call_parts)
-            if text:
-                parts.append(types.Part.from_text(text=text))
-            contents.append(types.Content(role="model", parts=parts))
-            responses: list[types.Part] = []
-            for part in call_parts:
-                fc = part.function_call
-                if fc is None:
+    client = _build_oci_client()
+    messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history]
+    system = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
+    messages.insert(0, {"role": "system", "content": system})
+
+    try:
+        while True:
+            payload: dict[str, Any] = {
+                "model": settings.oci_model_id,
+                "messages": messages,
+                "tools": openai_tools(),
+                "stream": True,
+            }
+
+            # --- un turno con reintentos ante errores transitorios ---
+            text = ""
+            emitted = 0
+            calls: dict[int, dict[str, Any]] = {}
+            saw_content = False
+
+            for attempt in range(MAX_ATTEMPTS):
+                text = ""
+                emitted = 0
+                calls = {}
+                saw_content = False
+                try:
+                    response = await client.chat.completions.create(**payload)
+                    async for chunk in response:
+                        choices = chunk.choices
+                        if not choices:
+                            continue
+                        delta = choices[0].delta
+
+                        content = getattr(delta, "content", None)
+                        if content:
+                            saw_content = True
+                            text += content
+                            partial, emitted = _emit_text_delta(text, emitted)
+                            if partial:
+                                yield TurnEvent("token", partial)
+
+                        for tool_call in getattr(delta, "tool_calls", None) or []:
+                            saw_content = True
+                            index = tool_call.index
+                            call = calls.setdefault(
+                                index, {"name": "", "arguments": "", "id": None}
+                            )
+                            if tool_call.id:
+                                call["id"] = tool_call.id
+                            fn = getattr(tool_call, "function", None)
+                            if fn:
+                                call["name"] += fn.name or ""
+                                call["arguments"] += fn.arguments or ""
+
+                    break  # turno completado sin excepciones
+
+                except (APITimeoutError, APIConnectionError, APIStatusError) as exc:
+                    if saw_content or not _is_oci_transient(exc) or attempt >= MAX_ATTEMPTS - 1:
+                        raise AIProviderError("oci", exc) from exc
+                    await asyncio.sleep(RETRY_DELAY * (attempt + 1))
                     continue
-                yield TurnEvent("tool_call", {"name": fc.name, "args": fc.args or {}})
-                result = await run_in_threadpool(execute_tool, fc.name, fc.args or {})
-                yield TurnEvent("tool_result", {"name": fc.name, "result": result})
-                responses.append(
-                    types.Part(
-                        function_response=types.FunctionResponse(
-                            name=fc.name,
-                            response={"result": result},
-                            id=fc.id,
-                        )
-                    )
-                )
-            if responses:
-                contents.append(types.Content(role="user", parts=responses))
-            continue
 
-        yield TurnEvent("text", text)
-        return
+            # --- resolver tool calls si las hay ---
+            if calls:
+                assistant_msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": text or None,
+                    "tool_calls": [
+                        {
+                            "id": call["id"],
+                            "type": "function",
+                            "function": {
+                                "name": call["name"],
+                                "arguments": call["arguments"],
+                            },
+                        }
+                        for _, call in sorted(calls.items())
+                    ],
+                }
+                messages.append(assistant_msg)
+                for _, call in sorted(calls.items()):
+                    try:
+                        args = json.loads(call["arguments"]) if call["arguments"] else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                    yield TurnEvent("tool_call", {"name": call["name"], "args": args})
+                    result = await run_in_threadpool(execute_tool, call["name"], args)
+                    yield TurnEvent("tool_result", {"name": call["name"], "result": result})
+                    messages.append(
+                        {"role": "tool", "tool_call_id": call["id"], "content": result}
+                    )
+                continue  # siguiente turno del modelo
+
+            yield TurnEvent("text", text)
+            return
+
+    except AIProviderError:
+        raise  # propagar limpiamente para el fallback en stream_chat()
+    except Exception as exc:
+        raise AIProviderError("oci", exc) from exc

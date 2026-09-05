@@ -229,6 +229,8 @@ describe('useChatStore', () => {
       imagePending: false,
       toolStatus: null,
       error: null,
+      aiProvider: null,
+      aiFallback: false,
     })
     await store.forceRecipe()
     expect(mockedStream).toHaveBeenCalledTimes(1)
@@ -245,6 +247,8 @@ describe('useChatStore', () => {
       imagePending: false,
       toolStatus: null,
       error: null,
+      aiProvider: null,
+      aiFallback: false,
     })
     await store.forceRecipe()
     expect(mockedStream).not.toHaveBeenCalled()

@@ -1,11 +1,6 @@
-import time
-from io import BytesIO
 from pathlib import Path
 
 import httpx
-from google import genai
-from google.genai import types
-from PIL import Image
 
 from ..config import settings
 
@@ -25,56 +20,11 @@ def image_url_for(recipe_hash: str) -> str | None:
     return None
 
 
-def _prompt(recipe: dict) -> str:
-    ingredientes = ", ".join(str(i.get("nombre", "")) for i in recipe.get("ingredientes", []))
-    return (
-        "Fotografía gastronómica profesional y apetitosa de este plato ya servido, "
-        "iluminación natural cálida, encuadre a 45 grados, fondo neutro. "
-        f"Plato: {recipe.get('nombre', '')}. "
-        f"Ingredientes principales: {ingredientes}. "
-        "Sin texto, sin marcas de agua."
-    )
-
-
-def _crop_16_9(img: Image.Image) -> Image.Image:
-    """Recorta al centro a 16:9 para eliminar bandas negras del generador."""
-    w, h = img.size
-    target = 16 / 9
-    if w / h > target:
-        new_w = int(h * target)
-        left = (w - new_w) // 2
-        return img.crop((left, 0, left + new_w, h))
-    new_h = int(w / target)
-    top = (h - new_h) // 2
-    return img.crop((0, top, w, top + new_h))
-
-
 def _save_image(recipe_hash: str, data: bytes) -> str | None:
     path = _image_path(recipe_hash)
     path.parent.mkdir(parents=True, exist_ok=True)
-    img = Image.open(BytesIO(data))
-    img = _crop_16_9(img)
-    img.save(path)
+    path.write_bytes(data)
     return image_url_for(recipe_hash)
-
-
-def _gemini_bytes(recipe: dict) -> bytes | None:
-    if not settings.gemini_api_key:
-        return None
-    client = genai.Client(api_key=settings.gemini_api_key)
-    try:
-        response = client.models.generate_content(
-            model=settings.image_model,
-            contents=_prompt(recipe),
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE"],
-                image_config=types.ImageConfig(aspect_ratio="16:9"),
-            ),
-        )
-        part = next(p for p in response.candidates[0].content.parts if p.inline_data is not None)
-    except Exception:
-        return None
-    return part.inline_data.data
 
 
 def _meal_db_thumb(recipe: dict) -> str | None:
@@ -100,15 +50,14 @@ def _meal_db_thumb(recipe: dict) -> str | None:
 
 
 def _commons_thumb(recipe: dict) -> str | None:
+    """Busca una imagen en Wikimedia Commons por nombre de receta."""
     nombre = str(recipe.get("nombre", "")).strip()
     if not nombre:
         return None
     words = nombre.split()
     first = " ".join(words[:2]) if len(words) >= 2 else words[0]
-    queries = [f"{first} comida", f"{words[0]} comida"]
-    for i, query in enumerate(queries):
-        if i > 0:
-            time.sleep(1)
+    queries = [f"{first} food", f"{words[0]} food"]
+    for query in queries:
         try:
             res = httpx.get(
                 COMMONS_API_URL,
@@ -160,6 +109,7 @@ def _download_image(url: str) -> bytes | None:
 
 
 def _web_bytes(recipe: dict) -> bytes | None:
+    """Intenta obtener la imagen desde TheMealDB o Wikimedia Commons."""
     url = _meal_db_thumb(recipe) or _commons_thumb(recipe)
     if not url:
         return None
@@ -167,14 +117,23 @@ def _web_bytes(recipe: dict) -> bytes | None:
 
 
 def generate_recipe_image(recipe: dict, recipe_hash: str) -> str | None:
+    """Obtiene la imagen para una receta.
+
+    Pipeline (Task 3b mejorará esto con Unsplash y traducción de términos):
+    1. Cache en disco — retorna inmediatamente si ya existe.
+    2. TheMealDB — busca por nombre de receta.
+    3. Wikimedia Commons — búsqueda por palabras clave.
+    4. None — el frontend muestra el placeholder SVG.
+    """
+    if settings.image_source == "none":
+        return None
+
     cached = image_url_for(recipe_hash)
     if cached is not None:
         return cached
-    data: bytes | None = None
-    if settings.image_source in ("auto", "gemini"):
-        data = _gemini_bytes(recipe)
-    if data is None and settings.image_source in ("auto", "web"):
-        data = _web_bytes(recipe)
+
+    data = _web_bytes(recipe)
     if data is None:
         return None
+
     return _save_image(recipe_hash, data)
