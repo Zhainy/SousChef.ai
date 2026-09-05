@@ -36,6 +36,7 @@ const error = ref<string | null>(null)
 const faltantes = ref<Faltante[]>([])
 const showInstructions = ref(false)
 const heartPop = ref(0)
+const imgFailed = ref(false)
 
 const favorited = computed(() => {
   const hash = props.recipe.hash
@@ -107,6 +108,14 @@ function discard(): void {
   }
 }
 
+function handleImgError(): void {
+  imgFailed.value = true
+  const hash = props.recipe.hash
+  if (hash) {
+    recipesStore.clearBrokenImage(hash)
+  }
+}
+
 async function cook(): Promise<void> {
   if (cooking.value || cooked.value) return
   cooking.value = true
@@ -118,6 +127,20 @@ async function cook(): Promise<void> {
       cooked.value = true
       const hash = props.recipe.hash
       if (hash) recipesStore.markCooked(hash)
+
+      toasts.notify(`¡"${props.recipe.nombre}" cocinada con éxito!`, 'success', 5000)
+
+      if (result.descontados && result.descontados.length > 0) {
+        result.descontados.forEach((d, idx) => {
+          const cant = Number.isInteger(d.cantidad)
+            ? d.cantidad
+            : Math.round(d.cantidad * 100) / 100
+          const un = d.unidad ? ` ${d.unidad}` : ''
+          setTimeout(() => {
+            toasts.notify(`Descontado: -${cant}${un} de ${d.nombre}`, 'info', 5000)
+          }, (idx + 1) * 220)
+        })
+      }
     }
   } catch (e) {
     const missing = faltantesFromError(e)
@@ -148,19 +171,20 @@ async function cook(): Promise<void> {
       </div>
       <Transition name="imgfade" appear>
         <img
-          v-if="imageUrl"
+          v-if="imageUrl && !imgFailed"
           :src="imageUrl"
           :alt="`Imagen de ${recipe.nombre}`"
           class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          @error="handleImgError"
         />
       </Transition>
       <div
-        v-if="!imagePending && !imageUrl"
-        class="absolute inset-0 flex items-center justify-center"
+        v-if="(!imagePending && !imageUrl) || imgFailed"
+        class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-basil-50 via-oat-100/70 to-basil-100/40 text-basil-500"
       >
         <svg
           viewBox="0 0 32 32"
-          class="h-10 w-10 text-basil-300 transition-transform duration-300 group-hover:scale-110"
+          class="h-12 w-12 text-basil-400 transition-transform duration-300 group-hover:scale-110"
           fill="none"
           aria-hidden="true"
         >
@@ -173,6 +197,7 @@ async function cook(): Promise<void> {
             stroke-linecap="round"
           />
         </svg>
+        <span class="text-[11px] font-semibold tracking-wide text-basil-700/80">Receta casera</span>
       </div>
 
       <span

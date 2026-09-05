@@ -87,3 +87,26 @@ def test_create_invalid_cantidad(client):
     }
     res = client.post("/api/ingredients", json=payload)
     assert res.status_code == 422
+
+
+def test_recreate_depleted_ingredient_succeeds(client, engine):
+    from sqlmodel import Session
+    from app.inventory import find_ingredient
+
+    with Session(engine) as session:
+        target = find_ingredient(session, "tomate")
+        assert target is not None
+        target.cantidad = 0.0
+        session.add(target)
+        session.commit()
+
+    payload = {
+        "nombre": "tomate",
+        "cantidad": 4,
+        "unidad": "piezas",
+        "categoria": "verduras",
+    }
+    res = client.post("/api/ingredients", json=payload)
+    assert res.status_code == 201
+    assert res.json()["cantidad"] == 4
+    assert res.json()["nombre"] == "tomate"

@@ -15,6 +15,11 @@ engine = create_engine(
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     migrate(engine)
+    with Session(engine) as session:
+        from sqlmodel import delete
+        from .models import Ingredient
+        session.exec(delete(Ingredient).where(Ingredient.cantidad <= 0))
+        session.commit()
 
 
 def migrate(engine_: Any) -> None:

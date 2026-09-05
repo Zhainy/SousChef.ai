@@ -51,7 +51,11 @@ def openai_tools() -> list[dict[str, Any]]:
 
 def get_inventario() -> dict[str, Any]:
     with Session(engine) as session:
-        items = list(session.exec(select(Ingredient).order_by(Ingredient.nombre)).all())
+        items = list(
+            session.exec(
+                select(Ingredient).where(Ingredient.cantidad > 0).order_by(Ingredient.nombre)
+            ).all()
+        )
     return {
         "inventario": [
             {
@@ -60,9 +64,15 @@ def get_inventario() -> dict[str, Any]:
                 "unidad": i.unidad,
                 "categoria": i.categoria,
                 "gramos_por_unidad": i.gramos_por_unidad,
+                "limite_maximo_para_receta": f"Usa COMO MÁXIMO {i.cantidad} {i.unidad}",
             }
             for i in items
-        ]
+        ],
+        "regla_critica": (
+            "Para que la receta se pueda cocinar, la cantidad de CADA ingrediente "
+            "NUNCA debe superar el límite indicado en el inventario. Ajusta la receta "
+            "y las porciones a las cantidades exactas que el usuario tiene disponibles."
+        ),
     }
 
 

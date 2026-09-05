@@ -7,7 +7,7 @@ def _cook(client, ingredientes, nombre="Pollo al limón"):
 
 def _cantidad(client, nombre):
     items = client.get("/api/ingredients").json()
-    return next(i["cantidad"] for i in items if i["nombre"] == nombre)
+    return next((i["cantidad"] for i in items if i["nombre"] == nombre), 0)
 
 
 def test_cook_success(client):
@@ -56,6 +56,19 @@ def test_cook_partial_failure_does_not_deduct(client):
 
 def test_cook_normalizes_names(client):
     res = _cook(client, [{"nombre": "  Tomate ", "cantidad": 1}])
+    assert res.status_code == 200
+    assert _cantidad(client, "tomate") == 2
+
+
+def test_cook_matches_without_accent(client):
+    res = _cook(client, [{"nombre": "atun", "cantidad": 1, "unidad": "lata"}])
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+    assert _cantidad(client, "atún") == 1
+
+
+def test_cook_matches_plural_and_singular(client):
+    res = _cook(client, [{"nombre": "tomates", "cantidad": 1}])
     assert res.status_code == 200
     assert _cantidad(client, "tomate") == 2
 
@@ -125,6 +138,8 @@ def test_cook_converts_grams_when_container_has_gramos_por_unidad(client):
     body = res.json()
     assert body["descontados"][0]["cantidad"] == 2
     assert _cantidad(client, "atún") == 0
+    # Confirma que fue eliminado de la lista de ingredientes disponibles
+    assert not any(i["nombre"] == "atún" for i in client.get("/api/ingredients").json())
 
 
 def test_cook_insufficient_grams_reports_detail(client):
@@ -134,3 +149,27 @@ def test_cook_insufficient_grams_reports_detail(client):
     assert faltante["motivo"] == "stock insuficiente"
     assert "280 g" in faltante["detalle"]
     assert _cantidad(client, "atún") == 2
+
+
+def test_cook_converts_package_with_gramos_por_unidad_to_grams(client):
+    items = client.get("/api/ingredients").json()
+    pasta = next(i for i in items if i["nombre"] == "pasta")
+    client.patch(
+        f"/api/ingredients/{pasta['id']}",
+        json={
+            "cantidad": 3.0,
+            "unidad": "paquete",
+            "gramos_por_unidad": 500.0,
+        },
+    )
+    res = _cook(client, [{"nombre": "pasta", "cantidad": 200, "unidad": "gramos"}])
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ok"] is True
+    assert _cantidad(client, "pasta") == 2.6
+
+
+def test_cook_converts_spoons_to_grams(client):
+    res = _cook(client, [{"nombre": "mantequilla", "cantidad": 1, "unidad": "cucharada"}])
+    assert res.status_code == 200
+    assert _cantidad(client, "mantequilla") == 85.0

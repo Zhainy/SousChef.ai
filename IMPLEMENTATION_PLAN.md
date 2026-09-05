@@ -319,7 +319,7 @@ ALLOW_ORIGINS=http://localhost,https://tudominio.com
 
 ## 7. Task Breakdown
 
-### Task 1 — Preparar la capa de configuración
+### [x] Task 1 — Preparar la capa de configuración
 
 **Objetivo:** Extender `config.py` y `.env.example` para soportar OCI sin romper la configuración
 actual. Eliminar los campos de Gemini.
@@ -350,7 +350,7 @@ los campos OCI con sus defaults sin errores, sin campos Gemini.
 
 ---
 
-### Task 2 — Implementar `oci_stream()` como nuevo proveedor LLM
+### [x] Task 2 — Implementar `oci_stream()` como nuevo proveedor LLM
 
 **Objetivo:** Crear `oci_stream()` en `agent/llm.py` que respeta el contrato de `TurnEvent`
 existente, usando la API compatible con OpenAI de OCI Generative AI.
@@ -378,7 +378,7 @@ sugerencias de recetas generadas por `meta.llama-3.3-70b-instruct`.
 
 ---
 
-### Task 3 — Implementar el patrón fallback en `stream_chat()`
+### [x] Task 3 — Implementar el patrón fallback en `stream_chat()`
 
 **Objetivo:** Fallback transparente OCI → llama.cpp ante cualquier fallo que ocurra antes de
 emitir tokens al cliente.
@@ -411,7 +411,7 @@ El evento `provider_info` visible en las DevTools indica el origen del fallback.
 
 ---
 
-### Task 3b — Refactorizar `image_service.py` — eliminar Gemini, mejorar pipeline web
+### [x] Task 3b — Refactorizar `image_service.py` — eliminar Gemini, mejorar pipeline web
 
 **Objetivo:** Limpiar toda dependencia de Gemini del servicio de imágenes y reemplazar la
 búsqueda imprecisa por una pipeline gratuita, confiable y sin API keys.
@@ -456,7 +456,7 @@ segunda consulta retorna inmediatamente desde cache sin llamadas de red.
 
 ---
 
-### Task 4 — Dockerfile del backend (multi-stage, ARM64-compatible)
+### [x] Task 4 — Dockerfile del backend (multi-stage, ARM64-compatible)
 
 **Objetivo:** Imagen Docker optimizada para ARM64 (OCI A1) y AMD64 (desarrollo local x86).
 
@@ -503,7 +503,7 @@ montado como volumen — nunca dentro de la imagen.
 
 ---
 
-### Task 5 — Dockerfile de llama.cpp para ARM64
+### [x] Task 5 — Dockerfile de llama.cpp para ARM64
 
 **Objetivo:** Contenedor `llama-server` multi-arch con el modelo GGUF montado como volumen.
 
@@ -511,22 +511,24 @@ montado como volumen — nunca dentro de la imagen.
 
 **Implementación:**
 ```dockerfile
-FROM ghcr.io/ggerganov/llama.cpp:server
+FROM ghcr.io/ggml-org/llama.cpp:server
 
 ENV MODEL_PATH=/models/Qwen3.5-4B-Q4_K_M.gguf
 ENV LLAMA_PORT=8080
 ENV LLAMA_CTX=8192
 ENV LLAMA_THREADS=4
+ENV LLAMA_ARG_REASONING=on
+ENV LLAMA_ARG_THINK_BUDGET=1024
 
 EXPOSE 8080
 
 ENTRYPOINT ["/bin/sh", "-c", \
-  "/llama-server -m ${MODEL_PATH} --port ${LLAMA_PORT} \
+  "/app/llama-server -m ${MODEL_PATH} --port ${LLAMA_PORT} \
    --ctx-size ${LLAMA_CTX} --threads ${LLAMA_THREADS} \
-   --host 0.0.0.0"]
+   --host 0.0.0.0 \"$@\"", "--"]
 ```
 
-La imagen oficial `ghcr.io/ggerganov/llama.cpp:server` ya soporta ARM64 y AMD64 nativamente.
+La imagen oficial `ghcr.io/ggml-org/llama.cpp:server` soporta ARM64 y AMD64 nativamente.
 El modelo GGUF **no se incluye en la imagen** — se monta desde el host.
 
 **Tests:** `docker run -v /path/to/model:/models souschef-llama` arranca y responde en `/health`.
@@ -535,7 +537,7 @@ El modelo GGUF **no se incluye en la imagen** — se monta desde el host.
 
 ---
 
-### Task 6 — Dockerfile del frontend + Nginx con HTTPS
+### [x] Task 6 — Dockerfile del frontend + Nginx con HTTPS
 
 **Objetivo:** Frontend Vue servido por Nginx con HTTPS (Let's Encrypt) y redirect HTTP→HTTPS.
 
@@ -619,7 +621,7 @@ HTTP redirige a HTTPS con código 301.
 
 ---
 
-### Task 7 — `docker-compose.yml` base (desarrollo local)
+### [x] Task 7 — `docker-compose.yml` base (desarrollo local)
 
 **Objetivo:** Stack completo para desarrollo local con un solo `docker compose up`.
 
@@ -671,7 +673,7 @@ chat responde (llama.cpp local o OCI según `.env`).
 
 ---
 
-### Task 8 — `docker-compose.prod.yml` override para OCI
+### [x] Task 8 — `docker-compose.prod.yml` override para OCI
 
 **Objetivo:** Override de producción para OCI: sin hot-reload, volúmenes en Block Volume,
 HTTPS activo, restart policies, certbot integrado.
@@ -730,7 +732,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ---
 
-### Task 9 — Infraestructura OCI con Terraform
+### [x] Task 9 — Infraestructura OCI con Terraform
 
 **Objetivo:** Provisionar toda la infraestructura OCI necesaria dentro del Always Free,
 versionada en el repo, reproducible con un solo comando.

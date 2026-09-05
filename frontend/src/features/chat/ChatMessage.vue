@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useChatStore, type ChatEntry } from '../../stores/chat'
 import AppLoader from '../../components/ui/AppLoader.vue'
+import MarkdownText from '../../components/MarkdownText.vue'
 import RecipeCard from './RecipeCard.vue'
 import TypingIndicator from './TypingIndicator.vue'
 
@@ -46,7 +47,11 @@ const askingRecipe = computed(() => canAskRecipe.value && store.streaming)
         <AppLoader size="sm" tone="saffron" role="progress" />
         {{ entry.toolStatus }}
       </p>
-      <p v-if="entry.content" class="whitespace-pre-wrap">{{ entry.content }}</p>
+      <MarkdownText
+        v-if="entry.content"
+        :text="entry.content"
+        class="text-sm leading-relaxed"
+      />
       <TypingIndicator v-else-if="pending" class="py-1" />
       <RecipeCard
         v-if="entry.recipe"

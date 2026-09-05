@@ -31,7 +31,13 @@ function loadSaved(): SavedRecipe[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed.filter(isSavedRecipe) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isSavedRecipe).map((r) => {
+      if (r.imageUrl && r.imageUrl.startsWith('static/')) {
+        r.imageUrl = '/' + r.imageUrl
+      }
+      return r
+    })
   } catch {
     return []
   }
@@ -79,6 +85,10 @@ export const useRecipesStore = defineStore('recipes', () => {
     if (idx === -1) return
     saved.value[idx].imageUrl = url
     persist()
+  }
+
+  function clearBrokenImage(hash: string): void {
+    updateImage(hash, null)
   }
 
   function toggleFavorite(hash: string): void {
@@ -134,6 +144,7 @@ export const useRecipesStore = defineStore('recipes', () => {
     saved,
     save,
     updateImage,
+    clearBrokenImage,
     toggleFavorite,
     markCooked,
     remove,

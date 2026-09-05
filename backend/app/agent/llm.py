@@ -15,29 +15,33 @@ from .tools import execute_tool, openai_tools
 RECIPE_FENCE = "```json"
 
 SYSTEM_INSTRUCTION = (
-    'Eres "SousChef", un asistente de cocina que prepara recetas usando SOLO lo que hay '
-    "en la despensa del usuario.\n\n"
-    "Reglas:\n"
-    "1. Cuando el usuario pregunte qué puede cocinar, llama primero a get_inventario() "
-    "para conocer el stock real.\n"
-    "2. Usa SIEMPRE los nombres de ingrediente exactos que devuelve get_inventario() "
-    "y las mismas unidades.\n"
-    "3. Cuando sugieras una receta, escribe ÚNICAMENTE una presentación breve de 1-2 "
-    "frases. NO repitas en el texto los ingredientes ni las instrucciones: esos detalles "
-    "van solo en el bloque JSON que añades al final, con este esquema:\n"
+    'Eres "SousChef", un asistente de cocina inteligente que prepara recetas deliciosas usando '
+    "ÚNICAMENTE lo que hay disponible en la despensa del usuario.\n\n"
+    "Reglas Obligatorias:\n"
+    "1. Cuando el usuario pregunte qué cocinar o pida sugerencias, llama primero a get_inventario() "
+    "para conocer el stock real disponible.\n"
+    "2. REGLA CRÍTICA DE CANTIDADES: La cantidad de CADA ingrediente en la receta NUNCA debe superar "
+    "la cantidad disponible en get_inventario(). Si el usuario tiene disponible 10 g de mantequilla, "
+    "la receta debe usar COMO MÁXIMO 10 g de mantequilla (ej: 10 g o 5 g), NUNCA 15 g ni 20 g. "
+    "Ajusta las porciones culinarias a lo disponible para que el usuario pueda cocinar sin que falte stock.\n"
+    "3. Usa SIEMPRE los nombres exactos y las unidades del inventario (ej: 'g', 'ml', 'piezas', 'paquetes', 'latas'). "
+    "Si un ingrediente está en 'paquete' (ej: pasta), pide en 'paquete' (ej: 0.5 paquete, 1 paquete) o en gramos 'g' "
+    "sin superar los gramos totales disponibles (gramos_por_unidad * cantidad).\n"
+    "4. Cuando sugieras una receta, escribe ÚNICAMENTE una presentación breve de 1-2 "
+    "frases amables. NO repitas en el texto los ingredientes ni las instrucciones: esos detalles "
+    "van solo en el bloque JSON que añades al final, con este esquema exacto:\n"
     "```json\n"
     '{"nombre": "...", "resumen": "...", "tiempo_minutos": 25, "ingredientes": '
     '[{"nombre": "...", "cantidad": 200, "unidad": "g"}], "instrucciones": "1. ...\\n2. ..."}\n'
     "```\n"
-    '   - "cantidad" y "unidad" van en la misma unidad que tiene ese ingrediente en la '
-    "despensa (p. ej. g, ml, pieza, cucharada, lata).\n"
-    '   - Si un ingrediente usa "latas", "sobres" o "bolsas", el inventario incluye '
-    '"gramos_por_unidad"; puedes expresar la cantidad en gramos multiplicando por ese dato.\n'
-    '   - Escribe "instrucciones" como pasos numerados (1. ..., 2. ...), uno por línea.\n'
+    '   - Escribe "instrucciones" como pasos numerados detallados y claros (1. ..., 2. ...), uno por línea. '
+    'Cada paso debe explicar la técnica culinaria precisa (ej: saltear a fuego medio, hervir con sal, dorar), '
+    'los tiempos de cocción aproximados y consejos prácticos para que el plato quede delicioso. '
+    'Evita pasos telegráficos, vagos o excesivamente breves.\n'
     "   - No inventes ingredientes que no estén en el inventario.\n"
-    "4. Solo llama a descontar_stock(ingredientes=[...]) cuando el usuario pida "
-    "explícitamente cocinar esa receta. Si falta stock, infórmalo amablemente.\n"
-    "    5. Responde siempre en español, de forma breve y útil.\n"
+    "5. Solo llama a descontar_stock(ingredientes=[...]) cuando el usuario pida "
+    "explícitamente cocinar esa receta.\n"
+    "6. Responde siempre en español, de forma breve, cálida y útil.\n"
 )
 
 FORCE_RECIPE_HINT = (
@@ -89,15 +93,50 @@ def _emit_text_delta(text: str, emitted: int) -> tuple[str, int]:
 async def _post_stream(
     client: httpx.AsyncClient, url: str, payload: dict[str, Any]
 ) -> AsyncIterator[dict[str, Any]]:
-    async with client.stream("POST", url, json=payload) as response:
-        response.raise_for_status()
-        async for line in response.aiter_lines():
-            if not line.startswith("data:"):
-                continue
-            data = line[5:].strip()
-            if not data or data == "[DONE]":
-                continue
-            yield json.loads(data)
+    target_urls = []
+    # Si la URL usa el hostname de docker 'llama-cpp', priorizar host.docker.internal
+    # para aprovechar la GPU del host si ./scripts/serve_local.sh está corriendo
+    if "://llama-cpp:" in url:
+        target_urls.append(url.replace("://llama-cpp:", "://host.docker.internal:"))
+        target_urls.append(url)
+        target_urls.append(url.replace("://llama-cpp:", "://127.0.0.1:"))
+    else:
+        target_urls.append(url)
+
+    last_error: Exception | None = None
+    for target_url in target_urls:
+        try:
+            async with client.stream("POST", target_url, json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    yield json.loads(data)
+            return
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            last_error = exc
+            continue
+        except httpx.HTTPStatusError as exc:
+            body = ""
+            try:
+                body = (await exc.response.aread()).decode(errors="replace")
+            except Exception:
+                pass
+            detail = f"{exc} ({body})" if body else str(exc)
+            raise AIProviderError("local", RuntimeError(detail)) from exc
+
+    if last_error:
+        raise AIProviderError(
+            "local",
+            ConnectionError(
+                f"No se pudo conectar con el LLM local en '{url}'. "
+                "Asegúrate de que llama-server esté corriendo (ej: ./scripts/serve_local.sh) "
+                "o ejecuta el stack completo con 'docker compose up'."
+            ),
+        ) from last_error
 
 
 async def local_stream(
@@ -107,18 +146,29 @@ async def local_stream(
 ) -> AsyncIterator[TurnEvent]:
     owns_client = client is None
     http = client or httpx.AsyncClient(timeout=None)
-    messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history]
+    messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history if m.content]
     system = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
     messages.insert(0, {"role": "system", "content": system})
+
+    # Si force_recipe se activa justo después de un mensaje del asistente,
+    # añadir un turno de usuario explícito para no dejar al asistente al final
+    if force_recipe and messages and messages[-1].get("role") == "assistant":
+        messages.append({
+            "role": "user",
+            "content": "Entrega la ficha técnica de la receta en formato JSON con el esquema solicitado.",
+        })
+
     url = settings.local_llm_base_url.rstrip("/") + "/chat/completions"
     try:
         while True:
-            payload = {
+            payload: dict[str, Any] = {
                 "model": settings.local_llm_model,
                 "messages": messages,
-                "tools": openai_tools(),
                 "stream": True,
             }
+            # Solo enviar herramientas si NO estamos forzando ficha de receta
+            if not force_recipe:
+                payload["tools"] = openai_tools()
             text = ""
             emitted = 0
             calls: dict[int, dict[str, Any]] = {}
@@ -134,7 +184,7 @@ async def local_stream(
                         yield TurnEvent("token", partial)
                 for tool_call in delta.get("tool_calls") or []:
                     index = tool_call["index"]
-                    call = calls.setdefault(index, {"name": "", "arguments": "", "id": None})
+                    call = calls.setdefault(index, {"name": "", "arguments": "", "id": f"call_{index}"})
                     if tool_call.get("id"):
                         call["id"] = tool_call["id"]
                     function = tool_call.get("function") or {}
@@ -144,21 +194,22 @@ async def local_stream(
             if calls:
                 assistant_message: dict[str, Any] = {
                     "role": "assistant",
-                    "content": text or None,
+                    "content": text or "",
                     "tool_calls": [
                         {
-                            "id": call["id"],
+                            "id": call["id"] or f"call_{idx}",
                             "type": "function",
                             "function": {
                                 "name": call["name"],
                                 "arguments": call["arguments"],
                             },
                         }
-                        for _, call in sorted(calls.items())
+                        for idx, call in sorted(calls.items())
                     ],
                 }
                 messages.append(assistant_message)
-                for _, call in sorted(calls.items()):
+                for idx, call in sorted(calls.items()):
+                    call_id = call["id"] or f"call_{idx}"
                     try:
                         args = json.loads(call["arguments"]) if call["arguments"] else {}
                     except json.JSONDecodeError:
@@ -166,7 +217,7 @@ async def local_stream(
                     yield TurnEvent("tool_call", {"name": call["name"], "args": args})
                     result = await run_in_threadpool(execute_tool, call["name"], args)
                     yield TurnEvent("tool_result", {"name": call["name"], "result": result})
-                    messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
+                    messages.append({"role": "tool", "tool_call_id": call_id, "content": result})
                 continue
 
             yield TurnEvent("text", text)
@@ -176,10 +227,10 @@ async def local_stream(
             await http.aclose()
 
 
-
 # ---------------------------------------------------------------------------
 # Proveedor OCI Generative AI
 # ---------------------------------------------------------------------------
+
 
 def _build_oci_auth() -> Any:
     """Construye el signer correcto según OCI_AUTH_TYPE.
@@ -324,9 +375,7 @@ async def oci_stream(
                     yield TurnEvent("tool_call", {"name": call["name"], "args": args})
                     result = await run_in_threadpool(execute_tool, call["name"], args)
                     yield TurnEvent("tool_result", {"name": call["name"], "result": result})
-                    messages.append(
-                        {"role": "tool", "tool_call_id": call["id"], "content": result}
-                    )
+                    messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
                 continue  # siguiente turno del modelo
 
             yield TurnEvent("text", text)

@@ -28,7 +28,7 @@ const html = computed(() =>
 }
 .markdown :deep(strong) {
   font-weight: 700;
-  color: #2e513c;
+  color: inherit;
 }
 .markdown :deep(em) {
   font-style: italic;

@@ -116,7 +116,7 @@ async def stream_chat(
          y AI_FALLBACK_ENABLED=true, reintenta con el proveedor de fallback.
       4. Si ya se emitieron tokens, propaga el error normalmente.
     """
-    provider = settings.llm_provider          # "oci" | "local"
+    provider = settings.llm_provider  # "oci" | "local"
     used_fallback = False
 
     # --- selección de proveedor primario ---
@@ -125,13 +125,28 @@ async def stream_chat(
     else:
         events = local_stream(messages, force_recipe=force_recipe)
 
-    text_acc = [""]       # lista mutable para acceder al texto acumulado post-loop
+    provider_info_emitted = False
+
+    if provider == "local":
+        yield ServerSentEvent(
+            data={"provider": "local", "fallback": False},
+            event="provider_info",
+        )
+        provider_info_emitted = True
+
+    text_acc = [""]  # lista mutable para acceder al texto acumulado post-loop
     emitted_acc = [0]
     tokens_emitted = False
 
     try:
         # --- primer intento con el proveedor primario ---
         async for sse in _consume_events(events, text_acc, emitted_acc):
+            if not provider_info_emitted:
+                yield ServerSentEvent(
+                    data={"provider": provider, "fallback": False},
+                    event="provider_info",
+                )
+                provider_info_emitted = True
             if sse.event == "token":
                 tokens_emitted = True
             yield sse
@@ -145,6 +160,12 @@ async def stream_chat(
         # --- fallback al proveedor secundario ---
         used_fallback = True
         fallback_provider = settings.ai_fallback_provider  # siempre "local" por ahora
+        yield ServerSentEvent(
+            data={"provider": fallback_provider, "fallback": True},
+            event="provider_info",
+        )
+        provider_info_emitted = True
+
         text_acc = [""]
         emitted_acc = [0]
         fallback_events = local_stream(messages, force_recipe=force_recipe)
@@ -161,12 +182,13 @@ async def stream_chat(
         yield ServerSentEvent(data={"message": str(exc)}, event="error")
         return
 
-    # --- emitir provider_info con el proveedor que realmente respondió ---
-    actual_provider = settings.ai_fallback_provider if used_fallback else provider
-    yield ServerSentEvent(
-        data={"provider": actual_provider, "fallback": used_fallback},
-        event="provider_info",
-    )
+    # Si por alguna razón el stream terminó sin eventos y sin haber emitido provider_info
+    if not provider_info_emitted:
+        actual_provider = settings.ai_fallback_provider if used_fallback else provider
+        yield ServerSentEvent(
+            data={"provider": actual_provider, "fallback": used_fallback},
+            event="provider_info",
+        )
 
     # --- post-procesamiento: receta e imagen ---
     text = text_acc[0]

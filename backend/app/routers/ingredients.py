@@ -12,13 +12,25 @@ router = APIRouter(prefix="/api/ingredients", tags=["ingredientes"])
 @router.get("")
 def list_ingredients(session: SessionDep) -> list[Ingredient]:
     return list(
-        session.exec(select(Ingredient).order_by(Ingredient.categoria, Ingredient.nombre)).all()
+        session.exec(
+            select(Ingredient)
+            .where(Ingredient.cantidad > 0)
+            .order_by(Ingredient.categoria, Ingredient.nombre)
+        ).all()
     )
 
 
 @router.post("", response_model=Ingredient, status_code=status.HTTP_201_CREATED)
 def create_ingredient(payload: IngredientCreate, session: SessionDep) -> Ingredient:
-    if find_ingredient(session, payload.nombre) is not None:
+    existing = find_ingredient(session, payload.nombre)
+    if existing is not None:
+        if existing.cantidad <= 0:
+            for field, value in payload.model_dump().items():
+                setattr(existing, field, value)
+            session.add(existing)
+            session.commit()
+            session.refresh(existing)
+            return existing
         raise HTTPException(status_code=409, detail="Ya existe un ingrediente con ese nombre")
     row = Ingredient(**payload.model_dump())
     session.add(row)
@@ -37,7 +49,7 @@ def update_ingredient(
     data = payload.model_dump(exclude_unset=True)
     if "nombre" in data:
         other = find_ingredient(session, data["nombre"])
-        if other is not None and other.id != row.id:
+        if other is not None and other.id != row.id and other.cantidad > 0:
             raise HTTPException(status_code=409, detail="Ya existe un ingrediente con ese nombre")
     for field, value in data.items():
         setattr(row, field, value)

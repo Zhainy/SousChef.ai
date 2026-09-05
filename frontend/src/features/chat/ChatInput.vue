@@ -42,6 +42,8 @@ onMounted(autoResize)
       class="flex flex-1 items-end rounded-3xl border border-oat-200 bg-white/90 p-2 shadow-md shadow-basil-900/5 backdrop-blur transition focus-within:border-basil-500 focus-within:ring-4 focus-within:ring-basil-100"
     >
       <textarea
+        id="chat-message-input"
+        name="chat-message-input"
         ref="textarea"
         v-model="text"
         rows="1"

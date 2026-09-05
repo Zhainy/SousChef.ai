@@ -28,6 +28,26 @@ const awaiting = computed(() => {
 
 const thinking = computed(() => awaiting.value && store.messages.length <= 2)
 
+const followUpSuggestions = computed(() => {
+  if (store.streaming || store.messages.length === 0) return []
+  const last = store.messages[store.messages.length - 1]
+  if (!last || last.role !== 'assistant') return []
+
+  if (last.recipe) {
+    const mainIng = last.recipe.ingredientes[0]?.nombre || 'mis ingredientes'
+    return [
+      `¿Qué otra receta puedo hacer usando ${mainIng}?`,
+      'Dame una opción más rápida o ligera',
+      '¿Qué postre o merienda puedo preparar con lo que tengo?',
+    ]
+  }
+  return [
+    '¿Qué otra receta me sugieres con mis ingredientes?',
+    'Dame una opción rápida de menos de 20 minutos',
+    '¿Cómo puedo aprovechar lo que está por vencer?',
+  ]
+})
+
 // Badge del proveedor de IA: muestra el último proveedor usado por un mensaje del asistente
 const aiProviderBadge = computed(() => {
   const last = [...store.messages].reverse().find(
@@ -55,7 +75,55 @@ async function send(content: string): Promise<void> {
 </script>
 
 <template>
-  <div class="mx-auto flex h-[calc(100dvh-11.5rem)] w-full max-w-3xl flex-col gap-4">
+  <div class="mx-auto flex h-[calc(100dvh-11.5rem)] w-full max-w-3xl flex-col gap-3">
+    <!-- Barra superior: Limpiar chat y Badge de IA -->
+    <div
+      v-if="store.messages.length > 0"
+      class="flex items-center justify-between px-1"
+    >
+      <button
+        type="button"
+        data-test="clear-chat"
+        class="inline-flex items-center gap-1.5 rounded-full border border-oat-200 bg-white/80 px-3 py-1 text-xs font-medium text-ink-600 shadow-sm backdrop-blur transition hover:border-tomato-300 hover:bg-tomato-50 hover:text-tomato-700"
+        title="Limpiar conversación"
+        @click="store.clear()"
+      >
+        <svg viewBox="0 0 20 20" class="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path
+            fill-rule="evenodd"
+            d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        Limpiar chat
+      </button>
+
+      <span
+        v-if="aiProviderBadge"
+        :class="[
+          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-wide transition-colors duration-300',
+          aiProviderBadge.fallback
+            ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
+            : aiProviderBadge.provider === 'oci'
+              ? 'bg-basil-100 text-basil-700 ring-1 ring-basil-300'
+              : 'bg-oat-100 text-ink-500 ring-1 ring-oat-300',
+        ]"
+      >
+        <span aria-hidden="true">
+          {{ aiProviderBadge.provider === 'oci' ? '✦' : '⚡' }}
+        </span>
+        <span>
+          {{
+            aiProviderBadge.provider === 'oci'
+              ? 'OCI AI'
+              : aiProviderBadge.fallback
+                ? 'Local AI (fallback)'
+                : 'Local AI'
+          }}
+        </span>
+      </span>
+    </div>
+
     <div ref="listEl" class="chat-scroll relative flex-1 overflow-y-auto pr-1">
       <div v-if="store.messages.length === 0" class="flex h-full flex-col items-center justify-center text-center">
         <div class="animate-float relative mb-6">
@@ -131,37 +199,23 @@ async function send(content: string): Promise<void> {
       </Transition>
     </div>
 
-    <!-- Badge proveedor de IA -->
-    <Transition name="badge">
+    <!-- Sugerencias de seguimiento (3 alternativas) -->
+    <Transition name="fade">
       <div
-        v-if="aiProviderBadge"
-        class="flex items-center justify-end pr-1"
-        aria-live="polite"
-        aria-label="Proveedor de IA activo"
+        v-if="followUpSuggestions.length > 0"
+        class="flex flex-wrap items-center gap-1.5 px-1"
       >
-        <span
-          :class="[
-            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-wide transition-colors duration-300',
-            aiProviderBadge.fallback
-              ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
-              : aiProviderBadge.provider === 'oci'
-                ? 'bg-basil-100 text-basil-700 ring-1 ring-basil-300'
-                : 'bg-oat-100 text-ink-500 ring-1 ring-oat-300',
-          ]"
-        >
-          <span aria-hidden="true">
-            {{ aiProviderBadge.provider === 'oci' ? '✦' : '⚡' }}
-          </span>
-          <span>
-            {{
-              aiProviderBadge.provider === 'oci'
-                ? 'OCI AI'
-                : aiProviderBadge.fallback
-                  ? 'Local AI (fallback)'
-                  : 'Local AI'
-            }}
-          </span>
+        <span class="text-[11px] font-medium uppercase tracking-wider text-ink-400">
+          Sugerencias:
         </span>
+        <button
+          v-for="alt in followUpSuggestions"
+          :key="alt"
+          class="rounded-full border border-oat-200 bg-white/90 px-3 py-1 text-xs font-medium text-basil-800 shadow-sm transition hover:-translate-y-0.5 hover:border-saffron-400 hover:text-saffron-700 hover:shadow"
+          @click="send(alt)"
+        >
+          💡 {{ alt }}
+        </button>
       </div>
     </Transition>
 
@@ -229,5 +283,15 @@ async function send(content: string): Promise<void> {
 .badge-leave-to {
   opacity: 0;
   transform: translateY(4px) scale(0.95);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 </style>

@@ -18,10 +18,15 @@ const confirming = ref<Ingredient | null>(null)
 const deleting = ref(false)
 const filters = ref({ search: '', categoria: '' })
 
+function stripAccents(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 const filtered = computed(() => {
-  const q = filters.value.search.trim().toLowerCase()
+  const q = stripAccents(filters.value.search.trim())
   return store.items.filter((item) => {
-    const matchesSearch = !q || item.nombre.toLowerCase().includes(q)
+    if (item.cantidad <= 0) return false
+    const matchesSearch = !q || stripAccents(item.nombre).includes(q)
     const matchesCategoria =
       !filters.value.categoria || item.categoria === filters.value.categoria
     return matchesSearch && matchesCategoria
@@ -93,8 +98,8 @@ async function confirmRemove(): Promise<void> {
           Inventario
         </h1>
         <p class="mt-1 text-sm text-ink-500">
-          {{ store.items.length }}
-          {{ store.items.length === 1 ? 'ingrediente' : 'ingredientes' }} registrados
+          {{ store.items.filter((i) => i.cantidad > 0).length }}
+          {{ store.items.filter((i) => i.cantidad > 0).length === 1 ? 'ingrediente' : 'ingredientes' }} registrados
         </p>
       </div>
       <button
