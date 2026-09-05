@@ -83,15 +83,24 @@ def _is_transient(exc: Exception) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Parser de tool calls escritos como texto plano (fallback para modelos como
-# Llama 3.3 que a veces emiten tool calls como JSON en el content)
+# Parser de tool calls escritos como texto plano.
+# Soporta múltiples formatos que los modelos locales (Qwen, Llama) usan:
+#   1. Nativo OpenAI:  {"name": "...", "arguments": {...}}
+#   2. Qwen tag:       <tool_call>{"name": "...", "arguments": {...}}</tool_call>
+#   3. Qwen/Llama alt: {"name": "...", "parameters": {...}}
 # ---------------------------------------------------------------------------
 
 _TOOL_NAMES = {d["name"] for d in TOOL_DEFS}
 
-# Patrón para detectar un objeto JSON que contenga "name" y "arguments"
+# Formato 1 y 3: objeto JSON con "name" + ("arguments" | "parameters")
 _TEXT_TOOL_RE = re.compile(
-    r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\{\s*\})\s*\}',
+    r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"(?:arguments|parameters)"\s*:\s*'
+    r'(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\{\s*\})\s*\}',
+    re.DOTALL,
+)
+# Formato 2: tags <tool_call>...</tool_call> de Qwen
+_QWEN_TAG_RE = re.compile(
+    r'<tool_call>\s*(\{.*?\})\s*</tool_call>',
     re.DOTALL,
 )
 
@@ -99,21 +108,43 @@ _TEXT_TOOL_RE = re.compile(
 def _extract_text_tool_calls(text: str) -> list[dict[str, Any]]:
     """Extrae tool calls escritos como texto plano en el contenido.
 
-    Detecta patrones {"name": "...", "arguments": {...}} y los devuelve
-    como lista de dicts con keys 'name' y 'arguments' (str JSON).
+    Detecta tres formatos comunes de modelos locales (Qwen, Llama 3.3):
+      1. {"name": "...", "arguments": {...}}
+      2. <tool_call>{"name": "...", "arguments": {...}}</tool_call>
+      3. {"name": "...", "parameters": {...}}
     Solo reconoce herramientas registradas en TOOL_DEFS.
+    Devuelve lista de dicts {name, arguments} donde arguments es str JSON.
     """
-    results = []
+    results: list[dict[str, Any]] = []
+    seen_names: set[str] = set()  # evitar duplicados
+
+    # Primero buscar tags Qwen (más específico)
+    for match in _QWEN_TAG_RE.finditer(text):
+        try:
+            obj = json.loads(match.group(1))
+            name = obj.get("name", "")
+            if name in _TOOL_NAMES and name not in seen_names:
+                args = obj.get("arguments", obj.get("parameters", {}))
+                args_str = json.dumps(args, ensure_ascii=False) if isinstance(args, dict) else args
+                results.append({"name": name, "arguments": args_str})
+                seen_names.add(name)
+        except (json.JSONDecodeError, AttributeError):
+            continue
+
+    # Luego buscar formato JSON plano
     for match in _TEXT_TOOL_RE.finditer(text):
         name = match.group(1)
-        if name in _TOOL_NAMES:
+        if name in _TOOL_NAMES and name not in seen_names:
             results.append({"name": name, "arguments": match.group(2)})
+            seen_names.add(name)
+
     return results
 
 
 def _strip_text_tool_calls(text: str) -> str:
     """Elimina los JSON de tool calls del texto para no mostrarlos al usuario."""
-    cleaned = _TEXT_TOOL_RE.sub("", text)
+    cleaned = _QWEN_TAG_RE.sub("", text)
+    cleaned = _TEXT_TOOL_RE.sub("", cleaned)
     return re.sub(r'\n{3,}', '\n\n', cleaned).strip()
 
 
@@ -209,9 +240,14 @@ async def local_stream(
             # Solo enviar herramientas si NO estamos forzando ficha de receta
             if not force_recipe:
                 payload["tools"] = openai_tools()
+                payload["tool_choice"] = "auto"  # fuerza decisión explícita al modelo
             text = ""
             emitted = 0
             calls: dict[int, dict[str, Any]] = {}
+            # Igual que en oci_stream: detectar si el primer token es '{'
+            # para poder capturar tool calls escritos como texto plano
+            maybe_text_tool = False
+            first_content = True
             async for chunk in _post_stream(http, url, payload):
                 choices = chunk.get("choices")
                 if not choices:
@@ -219,9 +255,17 @@ async def local_stream(
                 delta = choices[0].get("delta") or {}
                 if delta.get("content"):
                     text += delta["content"]
-                    partial, emitted = _emit_text_delta(text, emitted)
-                    if partial:
-                        yield TurnEvent("token", partial)
+                    if first_content:
+                        first_content = False
+                        stripped = text.lstrip()
+                        maybe_text_tool = (
+                            stripped.startswith("{")
+                            or stripped.startswith("<tool_call>")
+                        )
+                    if not maybe_text_tool:
+                        partial, emitted = _emit_text_delta(text, emitted)
+                        if partial:
+                            yield TurnEvent("token", partial)
                 for tool_call in delta.get("tool_calls") or []:
                     index = tool_call["index"]
                     call = calls.setdefault(index, {"name": "", "arguments": "", "id": f"call_{index}"})
@@ -230,6 +274,24 @@ async def local_stream(
                     function = tool_call.get("function") or {}
                     call["name"] += function.get("name", "")
                     call["arguments"] += function.get("arguments", "")
+
+            # --- detectar tool calls en texto plano (Qwen / Llama fallback) ---
+            if not calls and text:
+                text_calls = _extract_text_tool_calls(text)
+                if text_calls:
+                    for idx, tc in enumerate(text_calls):
+                        calls[idx] = {
+                            "name": tc["name"],
+                            "arguments": tc["arguments"],
+                            "id": f"local_text_{idx}",
+                        }
+                    text = _strip_text_tool_calls(text)
+
+            # --- emitir tokens acumulados (buffereados por maybe_text_tool) ---
+            if not calls and maybe_text_tool and text:
+                partial, emitted = _emit_text_delta(text, emitted)
+                if partial:
+                    yield TurnEvent("token", partial)
 
             if calls:
                 assistant_message: dict[str, Any] = {
