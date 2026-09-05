@@ -151,7 +151,7 @@ async def stream_chat(
                 tokens_emitted = True
             yield sse
 
-    except AIProviderError as exc:
+    except Exception as exc:
         # Solo hacemos fallback si no se emitió ningún token todavía
         if tokens_emitted or not settings.ai_fallback_enabled:
             yield ServerSentEvent(data={"message": str(exc)}, event="error")

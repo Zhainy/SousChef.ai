@@ -238,7 +238,14 @@ def _build_oci_auth() -> Any:
     - "api_key": lee ~/.oci/config (desarrollo local).
     - "instance_principal": usa el IAM role de la VM OCI (producción).
     """
-    from oci_openai import OciInstancePrincipalAuth, OciUserPrincipalAuth
+    from oci_openai import HttpxOciAuth, OciInstancePrincipalAuth, OciUserPrincipalAuth
+
+    try:
+        import httpx2
+        if hasattr(httpx2, "Auth") and httpx2.Auth not in HttpxOciAuth.__bases__:
+            HttpxOciAuth.__bases__ = (httpx2.Auth,)
+    except Exception:
+        pass
 
     if settings.oci_auth_type == "instance_principal":
         return OciInstancePrincipalAuth()
@@ -287,12 +294,17 @@ async def oci_stream(
             ValueError("OCI_COMPARTMENT_ID no está configurado en el entorno."),
         )
 
-    client = _build_oci_client()
+    try:
+        client = _build_oci_client()
+    except Exception as exc:
+        raise AIProviderError("oci", exc) from exc
+
     messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history]
     system = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
     messages.insert(0, {"role": "system", "content": system})
 
     try:
+
         while True:
             payload: dict[str, Any] = {
                 "model": settings.oci_model_id,
