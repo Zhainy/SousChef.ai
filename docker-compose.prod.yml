@@ -1,0 +1,40 @@
+services:
+  backend:
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-/opt/souschef/data}:/data
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0 --port 8000 --workers 2
+    ports: []
+
+  llama-cpp:
+    restart: unless-stopped
+    volumes:
+      - ${MODELS_DIR:-/opt/souschef/models}:/models
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    ports: []
+
+  frontend:
+    restart: unless-stopped
+    volumes:
+      - ${CERTBOT_CONF_DIR:-/opt/souschef/certbot/conf}:/etc/letsencrypt
+      - ${CERTBOT_WWW_DIR:-/opt/souschef/certbot/www}:/var/www/certbot
+      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - ${CERTBOT_CONF_DIR:-/opt/souschef/certbot/conf}:/etc/letsencrypt
+      - ${CERTBOT_WWW_DIR:-/opt/souschef/certbot/www}:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do certbot renew --webroot
+      -w /var/www/certbot --quiet; sleep 12h; done"

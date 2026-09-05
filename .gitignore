@@ -15,3 +15,7 @@ __pycache__/
 
 # Imágenes generadas por el agente
 backend/static/recipes/
+
+# Volúmenes locales de Docker
+data/
+models/
