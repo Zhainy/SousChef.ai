@@ -1,5 +1,5 @@
 # ==============================================================================
-# SousChef.ai - Variables de Configuración de OCI para Terraform
+# SousChef.ai - Variables de Configuracion de OCI para Terraform
 # ==============================================================================
 # Copia este archivo a 'terraform.tfvars' y completa con tus credenciales de OCI.
 # NUNCA subas 'terraform.tfvars' ni archivos .pem a Git.
@@ -17,19 +17,25 @@ fingerprint = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
 # Ruta local al archivo PEM de tu clave privada API Key
 private_key_path = "~/.oci/oci_api_key.pem"
 
-# Región donde tienes habilitado OCI Generative AI y Always Free
-region = "us-chicago-1"
+# Region donde tienes habilitado OCI Generative AI y Always Free
+region = "us-ashburn-1"
 
-# Opcional: OCID de un Compartimento específico (dejar comentado para usar raíz)
+# Opcional: OCID de un Compartimento especifico (dejar en blanco para usar el root tenancy)
 # compartment_id = "ocid1.compartment.oc1..aaaaaaaaxxxxxxxxx"
 
-# Clave SSH pública que se autorizará en la máquina virtual (ej: ~/.ssh/id_rsa.pub)
+# Clave SSH publica que se autorizara en la maquina virtual (ej: contenido de ~/.ssh/id_rsa.pub o ~/.ssh/id_ed25519.pub)
 ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... tu_email@ejemplo.com"
 
-# Recursos de cómputo dentro del Always Free (Ampere A1 Flex)
-instance_shape_ocpus     = 2    # OCPUs (máximo 4 gratis en cuenta Always Free)
-instance_shape_memory_gb = 12   # RAM en GB (máximo 24 GB gratis en cuenta Always Free)
-boot_volume_size_in_gbs  = 100  # Disco de arranque en GB (máximo 200 GB gratis)
+# Seguridad SSH: IP o CIDR autorizado para conectar por SSH (ej: tu IP "190.x.x.x/32" o "0.0.0.0/0")
+ssh_source_cidr = "0.0.0.0/0"
+
+# Indice de Availability Domain (0, 1 o 2). Si recibes "Out of host capacity" en Ampere A1, cambia a 1 o 2.
+availability_domain_number = 0
+
+# Recursos de computo dentro del Always Free (Ampere A1 Flex)
+instance_shape_ocpus     = 2   # OCPUs (maximo 4 gratis en cuenta Always Free)
+instance_shape_memory_gb = 12  # RAM en GB (maximo 24 GB gratis en cuenta Always Free)
+boot_volume_size_in_gbs  = 50  # Disco de arranque en GB (min 50 GB, max 200 GB gratis en Always Free)
 
 # Repositorio Git a clonar en la instancia
 github_repo_url = "https://github.com/Zhainy/SousChef.ai.git"

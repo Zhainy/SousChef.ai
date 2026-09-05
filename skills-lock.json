@@ -7,11 +7,23 @@
       "skillPath": "fastapi/.agents/skills/fastapi/SKILL.md",
       "computedHash": "e85d9e223fbc3183b1a599bbe8b02d2edf275d046ff5bcfd14352c92cdff52b3"
     },
+    "oracle-cloud": {
+      "source": "dauquangthanh/hanoi-rainbow",
+      "sourceType": "github",
+      "skillPath": "skills/oracle-cloud/SKILL.md",
+      "computedHash": "a9e2631e3bfc2356fce79147791c644bd8a020eb781b74cd62f813a6bf78a8ae"
+    },
     "tailwind-css-patterns": {
       "source": "giuseppe-trisciuoglio/developer-kit",
       "sourceType": "github",
       "skillPath": "plugins/developer-kit-typescript/skills/tailwind-css-patterns/SKILL.md",
       "computedHash": "6092620c3af955a46ea2b94ca8a40197ac8392e6bbdc8c7515659328b186c770"
+    },
+    "terraform-style-guide": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/terraform/skills/terraform-style-guide/SKILL.md",
+      "computedHash": "3b914c5ae01a7101d45b5222fbc38e0be6eb7412deba5f54d471905f22af70c6"
     },
     "vue-best-practices": {
       "source": "hyf0/vue-skills",

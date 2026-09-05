@@ -9,7 +9,7 @@ terraform.tfvars.json
 
 # Archivos de inicialización y plugins
 .terraform/
-.terraform.lock.hcl
+
 
 # Logs y volcados
 crash.log

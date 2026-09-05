@@ -1,83 +1,66 @@
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    oci = {
-      source  = "oracle/oci"
-      version = ">= 5.0.0"
-    }
-  }
-}
-
-provider "oci" {
-  tenancy_ocid     = var.tenancy_ocid
-  user_ocid        = var.user_ocid
-  fingerprint      = var.fingerprint
-  private_key_path = var.private_key_path
-  region           = var.region
-}
-
-locals {
-  compartment_id = var.compartment_id != "" ? var.compartment_id : var.tenancy_ocid
-}
-
-# 1. Availability Domain
+# 1. Availability Domains
 data "oci_identity_availability_domains" "ads" {
   compartment_id = local.compartment_id
 }
 
-# 2. Imagen Ubuntu ARM64 (Canonical Ubuntu para A1 Flex)
+# 2. Imagen Canonical Ubuntu 22.04 LTS para arquitectura ARM64 (A1 Flex)
 data "oci_core_images" "ubuntu" {
-  compartment_id   = local.compartment_id
-  operating_system = "Canonical Ubuntu"
-  shape            = "VM.Standard.A1.Flex"
-  sort_by          = "TIMECREATED"
-  sort_order       = "DESC"
+  compartment_id           = local.compartment_id
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "22.04"
+  shape                    = "VM.Standard.A1.Flex"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
 }
 
 # 3. Red Virtual en la Nube (VCN)
-resource "oci_core_vcn" "souschef_vcn" {
+resource "oci_core_vcn" "main" {
   compartment_id = local.compartment_id
   cidr_blocks    = ["10.0.0.0/16"]
   display_name   = "souschef-vcn"
   dns_label      = "souschef"
+  freeform_tags  = local.common_tags
 }
 
 # 4. Internet Gateway
-resource "oci_core_internet_gateway" "souschef_igw" {
+resource "oci_core_internet_gateway" "main" {
   compartment_id = local.compartment_id
-  vcn_id         = oci_core_vcn.souschef_vcn.id
+  vcn_id         = oci_core_vcn.main.id
   display_name   = "souschef-igw"
   enabled        = true
+  freeform_tags  = local.common_tags
 }
 
 # 5. Route Table hacia Internet Gateway
-resource "oci_core_route_table" "souschef_rt" {
+resource "oci_core_route_table" "main" {
   compartment_id = local.compartment_id
-  vcn_id         = oci_core_vcn.souschef_vcn.id
+  vcn_id         = oci_core_vcn.main.id
   display_name   = "souschef-route-table"
+  freeform_tags  = local.common_tags
 
   route_rules {
     destination       = "0.0.0.0/0"
     destination_type  = "CIDR_BLOCK"
-    network_entity_id = oci_core_internet_gateway.souschef_igw.id
+    network_entity_id = oci_core_internet_gateway.main.id
   }
 }
 
-# 6. Security List (Puertos 22 SSH, 80 HTTP, 443 HTTPS)
-resource "oci_core_security_list" "souschef_sl" {
+# 6. Security List (SSH, HTTP, HTTPS y PMTUD ICMP)
+resource "oci_core_security_list" "main" {
   compartment_id = local.compartment_id
-  vcn_id         = oci_core_vcn.souschef_vcn.id
+  vcn_id         = oci_core_vcn.main.id
   display_name   = "souschef-security-list"
+  freeform_tags  = local.common_tags
 
   egress_security_rules {
     destination = "0.0.0.0/0"
     protocol    = "all"
-    description = "Permitir todo el tráfico saliente"
+    description = "Permitir todo el trafico saliente"
   }
 
   ingress_security_rules {
     protocol    = "6" # TCP
-    source      = "0.0.0.0/0"
+    source      = var.ssh_source_cidr
     description = "SSH access"
     tcp_options {
       min = 22
@@ -88,7 +71,7 @@ resource "oci_core_security_list" "souschef_sl" {
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "0.0.0.0/0"
-    description = "HTTP access (Let's Encrypt y redirect)"
+    description = "HTTP access (Let's Encrypt y frontend)"
     tcp_options {
       min = 80
       max = 80
@@ -98,32 +81,44 @@ resource "oci_core_security_list" "souschef_sl" {
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "0.0.0.0/0"
-    description = "HTTPS access"
+    description = "HTTPS access seguro"
     tcp_options {
       min = 443
       max = 443
     }
   }
+
+  ingress_security_rules {
+    protocol    = "1" # ICMP
+    source      = "0.0.0.0/0"
+    description = "Path MTU Discovery (PMTUD) necesario en OCI para evitar caidas de paquetes TLS"
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
 }
 
 # 7. Subnet Pública
-resource "oci_core_subnet" "souschef_subnet" {
+resource "oci_core_subnet" "public" {
   compartment_id             = local.compartment_id
-  vcn_id                     = oci_core_vcn.souschef_vcn.id
+  vcn_id                     = oci_core_vcn.main.id
   cidr_block                 = "10.0.0.0/24"
   display_name               = "souschef-public-subnet"
   dns_label                  = "public"
-  route_table_id             = oci_core_route_table.souschef_rt.id
-  security_list_ids          = [oci_core_security_list.souschef_sl.id]
+  route_table_id             = oci_core_route_table.main.id
+  security_list_ids          = [oci_core_security_list.main.id]
   prohibit_public_ip_on_vnic = false
+  freeform_tags              = local.common_tags
 }
 
 # 8. Instancia Ampere A1 Compute (Always Free)
 resource "oci_core_instance" "souschef" {
   compartment_id      = local.compartment_id
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[var.availability_domain_number].name
   display_name        = "souschef-vm"
   shape               = "VM.Standard.A1.Flex"
+  freeform_tags       = local.common_tags
 
   shape_config {
     ocpus         = var.instance_shape_ocpus
@@ -137,7 +132,7 @@ resource "oci_core_instance" "souschef" {
   }
 
   create_vnic_details {
-    subnet_id        = oci_core_subnet.souschef_subnet.id
+    subnet_id        = oci_core_subnet.public.id
     display_name     = "souschef-primary-vnic"
     assign_public_ip = true
   }
@@ -158,14 +153,16 @@ resource "oci_identity_dynamic_group" "souschef_instances" {
   description    = "Grupo dinamico para la instancia de SousChef.ai"
   compartment_id = var.tenancy_ocid
   matching_rule  = "instance.id = '${oci_core_instance.souschef.id}'"
+  freeform_tags  = local.common_tags
 }
 
-# 10. IAM Policy para OCI Generative AI
+# 10. IAM Policy para OCI Generative AI (Menor Privilegio acotado al compartimento)
 resource "oci_identity_policy" "souschef_genai" {
   name           = "souschef-genai-policy"
-  description    = "Permite a la instancia SousChef usar OCI Generative AI sin secrets"
+  description    = "Permite a la instancia SousChef usar OCI Generative AI acotado al compartimento"
   compartment_id = var.tenancy_ocid
+  freeform_tags  = local.common_tags
   statements = [
-    "Allow dynamic-group ${oci_identity_dynamic_group.souschef_instances.name} to use generative-ai-family in tenancy"
+    "Allow dynamic-group ${oci_identity_dynamic_group.souschef_instances.name} to use generative-ai-family in compartment id ${local.compartment_id}"
   ]
 }
