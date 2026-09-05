@@ -15,6 +15,7 @@ from .tools import TOOL_DEFS, execute_tool, openai_tools
 
 RECIPE_FENCE = "```json"
 
+# Prompt completo para modelos grandes (OCI / Llama 70B)
 SYSTEM_INSTRUCTION = (
     'Eres "SousChef", un asistente de cocina inteligente que prepara recetas deliciosas usando '
     "ÚNICAMENTE lo que hay disponible en la despensa del usuario.\n\n"
@@ -47,6 +48,24 @@ SYSTEM_INSTRUCTION = (
     "de function calling de la API. NUNCA escribas el JSON de una herramienta como texto "
     "plano en tu respuesta. Si necesitas llamar a get_inventario o descontar_stock, hazlo "
     "solo a través del mecanismo de tool_calls de la API.\n"
+)
+
+# Prompt compacto para modelos pequeños (Qwen 4B / local).
+# Más corto y directo: los modelos pequeños siguen mejor instrucciones concisas.
+SYSTEM_INSTRUCTION_LOCAL = (
+    "Eres SousChef, asistente de cocina. REGLAS:\n"
+    "1. Si el usuario pide recetas o quiere saber qué cocinar: "
+    "llama a get_inventario() ANTES de responder. NUNCA inventes ingredientes.\n"
+    "2. Con el inventario obtenido, sugiere UNA receta posible. "
+    "Escribe 1-2 frases de presentación y luego el bloque JSON exactamente así:\n"
+    "```json\n"
+    '{"nombre": "Nombre receta", "resumen": "descripción breve", "tiempo_minutos": 20, '
+    '"ingredientes": [{"nombre": "item", "cantidad": 100, "unidad": "g"}], '
+    '"instrucciones": "1. Primer paso.\\n2. Segundo paso."}\n'
+    "```\n"
+    "3. No uses más cantidad de un ingrediente de la disponible en inventario.\n"
+    "4. Solo llama a descontar_stock() si el usuario dice que va a cocinar esa receta.\n"
+    "5. Responde siempre en español.\n"
 )
 
 FORCE_RECIPE_HINT = (
@@ -217,9 +236,11 @@ async def local_stream(
 ) -> AsyncIterator[TurnEvent]:
     owns_client = client is None
     http = client or httpx.AsyncClient(timeout=None)
-    messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in history if m.content]
-    system = SYSTEM_INSTRUCTION + (FORCE_RECIPE_HINT if force_recipe else "")
-    messages.insert(0, {"role": "system", "content": system})
+
+    # Prompt compacto para modelos pequeños (Qwen 4B): sigue mejor instrucciones cortas
+    system = SYSTEM_INSTRUCTION_LOCAL + (FORCE_RECIPE_HINT if force_recipe else "")
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
+    messages += [{"role": m.role, "content": m.content} for m in history if m.content]
 
     # Si force_recipe se activa justo después de un mensaje del asistente,
     # añadir un turno de usuario explícito para no dejar al asistente al final
@@ -229,7 +250,14 @@ async def local_stream(
             "content": "Entrega la ficha técnica de la receta en formato JSON con el esquema solicitado.",
         })
 
+    # Verificar si ya se llamó get_inventario en el historial de la conversación
+    # (mensajes de tipo 'tool' indican que hubo tool calls anteriores)
+    inventario_ya_consultado = any(
+        m["role"] == "tool" for m in messages
+    )
+
     url = settings.local_llm_base_url.rstrip("/") + "/chat/completions"
+    first_turn = True  # true solo en el primer ciclo del while
     try:
         while True:
             payload: dict[str, Any] = {
@@ -240,7 +268,16 @@ async def local_stream(
             # Solo enviar herramientas si NO estamos forzando ficha de receta
             if not force_recipe:
                 payload["tools"] = openai_tools()
-                payload["tool_choice"] = "auto"  # fuerza decisión explícita al modelo
+                # En el primer turno y si aún no se consultó el inventario,
+                # forzar get_inventario para evitar que el modelo invente ingredientes
+                if first_turn and not inventario_ya_consultado:
+                    payload["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": "get_inventario"},
+                    }
+                else:
+                    payload["tool_choice"] = "auto"
+            first_turn = False
             text = ""
             emitted = 0
             calls: dict[int, dict[str, Any]] = {}
