@@ -597,3 +597,50 @@ def test_stream_chat_handles_unified_json(monkeypatch):
     done_event = next(e for e in events if e.event == "done")
     assert done_event.data["message"] == "Te preparé una rica Sopa de Lentejas."
 
+
+def test_stream_chat_aligns_recipe_to_pantry_and_prunes_hallucinations(monkeypatch, engine):
+    from app.agent import agent as agent_mod
+    from app.schemas import ChatMessage
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
+
+    recipe_payload = (
+        "¡Aquí tienes una receta deliciosa!\n\n"
+        "```json\n"
+        "{\n"
+        '  "nombre": "Pollo al horno con verduras",\n'
+        '  "resumen": "Pollo dorado con verduras",\n'
+        '  "tiempo_minutos": 35,\n'
+        '  "ingredientes": [\n'
+        '    {"nombre": "pollo", "cantidad": 500, "unidad": "g"},\n'
+        '    {"nombre": "pimienta negra", "cantidad": 2, "unidad": "g"},\n'
+        '    {"nombre": "ají", "cantidad": 2, "unidad": "g"}\n'
+        '  ],\n'
+        '  "instrucciones": "1. Hornear el pollo."\n'
+        "}\n"
+        "```"
+    )
+
+    async def fake_local_stream(messages, force_recipe=False):
+        yield TurnEvent("text", recipe_payload)
+
+    monkeypatch.setattr(agent_mod, "local_stream", fake_local_stream)
+    monkeypatch.setattr(agent_mod.settings, "llm_provider", "local")
+
+    async def _run():
+        events = []
+        async for ev in agent_mod.stream_chat([ChatMessage(role="user", content="algo con pollo")]):
+            events.append(ev)
+        return events
+
+    events = asyncio.run(_run())
+    recipe_event = next(e for e in events if e.event == "recipe")
+    ingredientes = recipe_event.data["ingredientes"]
+
+    # "pollo" debe alinearse al nombre real de la despensa: "pechuga de pollo"
+    assert any(i["nombre"] == "pechuga de pollo" for i in ingredientes)
+    # "pimienta negra" y "ají" no existen en la despensa, deben haberse descartado
+    assert not any(i["nombre"] == "pimienta negra" for i in ingredientes)
+    assert not any(i["nombre"] == "ají" for i in ingredientes)
+
+

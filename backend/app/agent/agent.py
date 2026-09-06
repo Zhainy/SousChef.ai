@@ -209,6 +209,24 @@ async def stream_chat(
     try:
         recipe = _extract_recipe(text)
         if recipe is not None:
+            try:
+                from sqlmodel import Session
+                from ..db import engine
+                from ..inventory import find_ingredient
+
+                with Session(engine) as session:
+                    valid_ingredientes = []
+                    for ing in recipe.get("ingredientes", []):
+                        nombre_ing = ing.get("nombre", "")
+                        matched = find_ingredient(session, nombre_ing)
+                        if matched is not None:
+                            ing["nombre"] = matched.nombre
+                            valid_ingredientes.append(ing)
+                    if valid_ingredientes:
+                        recipe["ingredientes"] = valid_ingredientes
+            except Exception:
+                pass
+
             recipe_hash = _recipe_hash(recipe)
             yield ServerSentEvent(
                 data={**recipe, "hash": recipe_hash, "image_url": None},

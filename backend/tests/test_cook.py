@@ -173,3 +173,42 @@ def test_cook_converts_spoons_to_grams(client):
     res = _cook(client, [{"nombre": "mantequilla", "cantidad": 1, "unidad": "cucharada"}])
     assert res.status_code == 200
     assert _cantidad(client, "mantequilla") == 85.0
+
+
+def test_cook_matches_pollo_synonym_to_pechuga_de_pollo(client):
+    before = _cantidad(client, "pechuga de pollo")
+    assert before == 500
+    res = _cook(client, [{"nombre": "pollo", "cantidad": 200, "unidad": "g"}])
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+    assert _cantidad(client, "pechuga de pollo") == 300
+
+
+def test_cook_matches_aceite_to_aceite_de_oliva(client):
+    before = _cantidad(client, "aceite de oliva")
+    assert before == 500
+    res = _cook(client, [{"nombre": "aceite", "cantidad": 50, "unidad": "ml"}])
+    assert res.status_code == 200
+    assert _cantidad(client, "aceite de oliva") == 450
+
+
+def test_cook_matches_culinary_descriptors(client):
+    # "diente de ajo" -> "ajo"
+    res = _cook(client, [{"nombre": "diente de ajo", "cantidad": 1}])
+    assert res.status_code == 200
+    assert _cantidad(client, "ajo") == 0
+
+    # "cebolla picada" -> "cebolla"
+    before_cebolla = _cantidad(client, "cebolla")
+    res = _cook(client, [{"nombre": "cebolla picada", "cantidad": 1}])
+    assert res.status_code == 200
+    assert _cantidad(client, "cebolla") == before_cebolla - 1
+
+
+def test_cook_matches_carne_molida_to_carne_molida_de_res(client):
+    before = _cantidad(client, "carne molida de res")
+    assert before == 400
+    res = _cook(client, [{"nombre": "carne", "cantidad": 150, "unidad": "g"}])
+    assert res.status_code == 200
+    assert _cantidad(client, "carne molida de res") == 250
+

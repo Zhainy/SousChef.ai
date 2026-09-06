@@ -122,6 +122,86 @@ def _grams(
     return None
 
 
+_SYNONYMS: dict[str, str] = {
+    "pollo": "pechuga de pollo",
+    "pechuga": "pechuga de pollo",
+    "pechugas": "pechuga de pollo",
+    "pechugas de pollo": "pechuga de pollo",
+    "filete de pollo": "pechuga de pollo",
+    "filetes de pollo": "pechuga de pollo",
+    "tiras de pollo": "pechuga de pollo",
+    "trozos de pollo": "pechuga de pollo",
+    "carne": "carne molida de res",
+    "carne molida": "carne molida de res",
+    "carne picada": "carne molida de res",
+    "carne de res": "carne molida de res",
+    "res": "carne molida de res",
+    "aceite": "aceite de oliva",
+    "aceite vegetal": "aceite de oliva",
+    "queso": "queso rallado",
+    "pimiento": "pimiento morrón",
+    "pimientos": "pimiento morrón",
+    "morron": "pimiento morrón",
+    "morrones": "pimiento morrón",
+    "pasta": "espagueti",
+    "espagueti": "pasta",
+    "fideos": "pasta",
+    "spaghetti": "pasta",
+    "patata": "papa",
+    "patatas": "papa",
+    "lata de atun": "atun",
+    "atun en lata": "atun",
+}
+
+_PREFIXES = (
+    "dientes de ",
+    "diente de ",
+    "pechuga de ",
+    "pechugas de ",
+    "filetes de ",
+    "filete de ",
+    "trozos de ",
+    "trozo de ",
+    "tazas de ",
+    "taza de ",
+    "cucharadas de ",
+    "cucharada de ",
+    "jugo de ",
+    "hojas de ",
+    "ramitas de ",
+    "ramita de ",
+    "rodajas de ",
+    "gajos de ",
+)
+
+_SUFFIXES = (
+    " picado",
+    " picada",
+    " picados",
+    " picadas",
+    " rallado",
+    " rallada",
+    " molido",
+    " molida",
+    " en cubos",
+    " en rodajas",
+    " cocido",
+    " cocida",
+    " cocidos",
+    " cocidas",
+    " fresco",
+    " fresca",
+    " frescos",
+    " frescas",
+    " blanco",
+    " blanca",
+    " entero",
+    " entera",
+    " morado",
+    " morada",
+)
+
+
 def find_ingredient(session: Session, nombre: str) -> Ingredient | None:
     target = normalize(nombre)
     rows = list(session.exec(select(Ingredient)).all())
@@ -129,6 +209,7 @@ def find_ingredient(session: Session, nombre: str) -> Ingredient | None:
     for row in rows:
         if normalize(row.nombre) == target:
             return row
+
     # 2. Coincidencia singular / plural
     for row in rows:
         rn = normalize(row.nombre)
@@ -139,6 +220,48 @@ def find_ingredient(session: Session, nombre: str) -> Ingredient | None:
             or rn == target + "es"
         ):
             return row
+
+    # 3. Sinónimos culinarios directos
+    if target in _SYNONYMS:
+        syn = normalize(_SYNONYMS[target])
+        for row in rows:
+            rn = normalize(row.nombre)
+            if rn == syn or target == rn:
+                return row
+
+    # 4. Limpieza de prefijos y sufijos culinarios (ej: "cebolla picada" -> "cebolla", "dientes de ajo" -> "ajo")
+    clean_target = target
+    for p in _PREFIXES:
+        if clean_target.startswith(p):
+            clean_target = clean_target[len(p) :].strip()
+            break
+    for s in _SUFFIXES:
+        if clean_target.endswith(s):
+            clean_target = clean_target[: -len(s)].strip()
+            break
+
+    if clean_target != target:
+        for row in rows:
+            rn = normalize(row.nombre)
+            if rn == clean_target or clean_target == rn + "s" or rn == clean_target + "s":
+                return row
+        if clean_target in _SYNONYMS:
+            syn = normalize(_SYNONYMS[clean_target])
+            for row in rows:
+                if normalize(row.nombre) == syn:
+                    return row
+
+    # 5. Coincidencia por palabra clave unívoca
+    target_tokens = set(clean_target.split()) - {"de", "del", "la", "el", "en", "al"}
+    if target_tokens:
+        candidates: list[Ingredient] = []
+        for row in rows:
+            rn_tokens = set(normalize(row.nombre).split()) - {"de", "del", "la", "el", "en", "al"}
+            if target_tokens.issubset(rn_tokens) or rn_tokens.issubset(target_tokens):
+                candidates.append(row)
+        if len(candidates) == 1:
+            return candidates[0]
+
     return None
 
 

@@ -26,7 +26,8 @@ SYSTEM_INSTRUCTION = (
     "la cantidad disponible en get_inventario(). Si el usuario tiene disponible 10 g de mantequilla, "
     "la receta debe usar COMO MÁXIMO 10 g de mantequilla (ej: 10 g o 5 g), NUNCA 15 g ni 20 g. "
     "Ajusta las porciones culinarias a lo disponible para que el usuario pueda cocinar sin que falte stock.\n"
-    "3. Usa SIEMPRE los nombres exactos y las unidades del inventario (ej: 'g', 'ml', 'piezas', 'paquetes', 'latas'). "
+    "3. Usa SIEMPRE los nombres exactos y las unidades del inventario (ej: 'pechuga de pollo', 'aceite de oliva', 'g', 'ml', 'piezas', 'paquetes', 'latas'). "
+    "PROHIBIDO inventar ingredientes o agregar condimentos o especias no disponibles (ej: no agregues pimienta ni ají si no están en la despensa). "
     "Si un ingrediente está en 'paquete' (ej: pasta), pide en 'paquete' (ej: 0.5 paquete, 1 paquete) o en gramos 'g' "
     "sin superar los gramos totales disponibles (gramos_por_unidad * cantidad).\n"
     "4. Cuando sugieras una receta, escribe ÚNICAMENTE una presentación breve de 1-2 "
@@ -80,13 +81,15 @@ SYSTEM_INSTRUCTION_LOCAL = (
     "el plato sugerido DEBE centrarse en ese ingrediente.\n"
     "2. VARIEDAD: Explora los diferentes ingredientes de la despensa y varía tus propuestas. "
     "NUNCA repitas un plato o receta que ya se haya mencionado en la conversación.\n"
-    "3. STOCK REAL: Usa ÚNICAMENTE ingredientes presentes en la despensa indicada y respeta sus cantidades.\n"
+    "3. STOCK REAL Y NOMBRES EXACTOS: Usa ÚNICAMENTE ingredientes presentes en la lista de despensa. "
+    "Copia los nombres EXACTOS de la lista (por ejemplo: si en la despensa dice 'pechuga de pollo', pon 'pechuga de pollo', NO 'pollo'; si dice 'aceite de oliva', pon 'aceite de oliva'). "
+    "PROHIBIDO inventar ingredientes, especias o condimentos que no figuren en la despensa: NO agregues pimienta negra, ají, comino ni ningún otro ingrediente a menos que aparezca explícitamente en la lista de despensa. Si la despensa solo tiene sal y orégano, condimenta únicamente con sal y orégano.\n"
     "4. FORMATO OBLIGATORIO: Presenta tu propuesta en 1 sola frase breve y amable, "
     "e incluye SIEMPRE la receta en un bloque de código JSON con este esquema exacto:\n"
     "```json\n"
     '{"nombre": "Nombre del plato solicitado", "resumen": "Descripción apetitosa en una frase", '
     '"tiempo_minutos": 20, '
-    '"ingredientes": [{"nombre": "ingrediente_de_despensa", "cantidad": 100, "unidad": "g"}], '
+    '"ingredientes": [{"nombre": "nombre_exacto_de_despensa", "cantidad": 100, "unidad": "g"}], '
     '"instrucciones": "1. Paso uno.\\n2. Paso dos."}\n'
     "```\n"
     "5. REGLA CRÍTICA: PROHIBIDO redactar listas de ingredientes o pasos fuera del bloque ```json. "
@@ -96,7 +99,8 @@ SYSTEM_INSTRUCTION_LOCAL = (
 
 FORCE_RECIPE_HINT = (
     "\n\n7. El usuario acaba de solicitar la ficha técnica de la receta del plato recién mencionado. "
-    "Entrega de inmediato el bloque ```json con el esquema indicado arriba. "
+    "Entrega de inmediato el bloque ```json con el esquema indicado arriba usando ÚNICAMENTE ingredientes de la despensa con sus nombres exactos. "
+    "NO agregues pimienta, ají ni condimentos ausentes de la despensa. "
     "NO agregues texto narrativo fuera del bloque ```json."
 )
 
