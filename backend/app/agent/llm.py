@@ -71,36 +71,31 @@ def get_inventario_summary() -> str:
 
 
 # Prompt compacto para modelos pequeños (Qwen 2.5 1.5B / Llama 3.2-3B local).
-# Con pocos ejemplos (few-shot) y reglas negativas explícitas para garantizar JSON sin divagaciones.
 SYSTEM_INSTRUCTION_LOCAL = (
-    "Eres SousChef, asistente de cocina inteligente.\n"
-    "REGLAS OBLIGATORIAS:\n"
-    "1. Sugiere UNA receta usando ÚNICAMENTE ingredientes disponibles en la despensa indicada.\n"
-    "2. NUNCA inventes ingredientes ni superes las cantidades disponibles.\n"
-    "3. FORMATO DE SALIDA ESTRICTO: Escribe 1 sola frase breve y amable de presentación, "
-    "e inmediatamente incluye la receta en un bloque JSON con este esquema exacto:\n"
+    "Eres SousChef, un asistente de cocina inteligente.\n"
+    "REGLAS FUNDAMENTALES:\n"
+    "1. ATENCIÓN AL USUARIO: Adapta tu sugerencia ESTRICTAMENTE a lo que pida el usuario. "
+    "Si pide postre o merienda, sugiere un postre o snack dulce/salado. Si pide cena rápida, "
+    "sugiere algo rápido. Si pide un ingrediente específico (ej: pollo, arroz, verduras), "
+    "el plato sugerido DEBE centrarse en ese ingrediente.\n"
+    "2. VARIEDAD: Explora los diferentes ingredientes de la despensa y varía tus propuestas. "
+    "NUNCA repitas un plato o receta que ya se haya mencionado en la conversación.\n"
+    "3. STOCK REAL: Usa ÚNICAMENTE ingredientes presentes en la despensa indicada y respeta sus cantidades.\n"
+    "4. FORMATO OBLIGATORIO: Presenta tu propuesta en 1 sola frase breve y amable, "
+    "e incluye SIEMPRE la receta en un bloque de código JSON con este esquema exacto:\n"
     "```json\n"
-    '{"nombre": "Nombre receta", "resumen": "Descripción breve", "tiempo_minutos": 25, '
-    '"ingredientes": [{"nombre": "ingrediente", "cantidad": 100, "unidad": "g"}], '
+    '{"nombre": "Nombre del plato solicitado", "resumen": "Descripción apetitosa en una frase", '
+    '"tiempo_minutos": 20, '
+    '"ingredientes": [{"nombre": "ingrediente_de_despensa", "cantidad": 100, "unidad": "g"}], '
     '"instrucciones": "1. Paso uno.\\n2. Paso dos."}\n'
     "```\n"
-    "4. REGLA CRÍTICA: PROHIBIDO escribir listas de ingredientes, cantidades o pasos de "
-    "preparación fuera del bloque ```json. Todo el detalle culinario va DENTRO del JSON.\n"
-    "5. Responde siempre en español.\n"
-    "\nEJEMPLO DE RESPUESTA OBLIGATORIO:\n"
-    "¡Hola! Con lo que tienes en tu despensa te sugiero preparar una deliciosa Sopa de Lentejas.\n\n"
-    "```json\n"
-    '{"nombre": "Sopa de Lentejas", "resumen": "Sopa casera nutritiva y reconfortante", '
-    '"tiempo_minutos": 30, '
-    '"ingredientes": [{"nombre": "lentejas", "cantidad": 200, "unidad": "g"}, '
-    '{"nombre": "cebolla", "cantidad": 1, "unidad": "pieza"}], '
-    '"instrucciones": "1. Picar la cebolla y sofreír.\\n2. Añadir las lentejas y agua caliente.'
-    '\\n3. Cocinar a fuego lento durante 25 minutos."}\n'
-    "```\n"
+    "5. REGLA CRÍTICA: PROHIBIDO redactar listas de ingredientes o pasos fuera del bloque ```json. "
+    "Todo el detalle culinario va DENTRO del JSON para que el sistema genere la tarjeta visual.\n"
+    "6. Responde siempre en español.\n"
 )
 
 FORCE_RECIPE_HINT = (
-    "\n\n6. El usuario acaba de solicitar la ficha técnica de la receta. "
+    "\n\n7. El usuario acaba de solicitar la ficha técnica de la receta del plato recién mencionado. "
     "Entrega de inmediato el bloque ```json con el esquema indicado arriba. "
     "NO agregues texto narrativo fuera del bloque ```json."
 )
@@ -268,19 +263,39 @@ async def local_stream(
     )
 
     # Inyectar el inventario actual directamente en el prompt del sistema.
-    # Así los modelos pequeños (3B) tienen el stock a la vista sin requerir
-    # múltiples turnos de tool calls lentos en CPU.
     inv_summary = get_inventario_summary()
+
+    last_user_content = ""
+    for m in reversed(history):
+        if m.role == "user" and m.content:
+            last_user_content = m.content.lower().strip()
+            break
+
+    asks_recipe = force_recipe or any(
+        kw in last_user_content
+        for kw in [
+            "dame la receta",
+            "pasa la receta",
+            "pásame la receta",
+            "la receta",
+            "como se hace",
+            "cómo se hace",
+            "como la preparo",
+            "cómo la preparo",
+            "dame los pasos",
+            "pasame la receta",
+        ]
+    )
+
     system = (
         SYSTEM_INSTRUCTION_LOCAL
         + f"\nIngredientes en despensa: {inv_summary}\n"
-        + (FORCE_RECIPE_HINT if force_recipe else "")
+        + (FORCE_RECIPE_HINT if asks_recipe else "")
     )
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     messages += [{"role": m.role, "content": m.content} for m in history if m.content]
 
-    # Si force_recipe se activa justo después de un mensaje del asistente,
-    # añadir un turno de usuario explícito para no dejar al asistente al final
+    # Si se fuerza receta tras un turno del asistente, añadir prompt explícito
     if force_recipe and messages and messages[-1].get("role") == "assistant":
         messages.append({
             "role": "user",
@@ -295,7 +310,9 @@ async def local_stream(
                 "messages": messages,
                 "stream": True,
                 "max_tokens": 512,
-                "temperature": 0.2,
+                "temperature": 0.5 if not asks_recipe else 0.2,
+                "presence_penalty": 0.4,
+                "frequency_penalty": 0.2,
             }
             if not force_recipe:
                 payload["tools"] = openai_tools_local()

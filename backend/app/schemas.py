@@ -50,15 +50,38 @@ def normalize_recipe(data: dict) -> Recipe | None:
         return None
 
     ingredientes: list[RecipeIngredient] = []
-    raw_ingredientes = data.get("ingredientes") or data.get("ingredients") or []
+    raw_ingredientes = (
+        data.get("ingredientes")
+        or data.get("ingredients")
+        or data.get("items")
+        or data.get("ingrediente")
+        or []
+    )
     for ing in raw_ingredientes:
+        if isinstance(ing, str):
+            name = ing.strip()
+            if name:
+                ingredientes.append(RecipeIngredient(nombre=name[:120], cantidad=1.0, unidad=None))
+            continue
         if not isinstance(ing, dict):
             continue
-        name = str(ing.get("nombre") or ing.get("name") or "").strip()
+        name = str(
+            ing.get("nombre")
+            or ing.get("name")
+            or ing.get("item")
+            or ing.get("ingrediente")
+            or ""
+        ).strip()
         if not name:
             continue
-        cant_raw = ing.get("cantidad") if ing.get("cantidad") is not None else (
-            ing.get("amount") if ing.get("amount") is not None else ing.get("quantity")
+        cant_raw = (
+            ing.get("cantidad")
+            if ing.get("cantidad") is not None
+            else (
+                ing.get("amount")
+                if ing.get("amount") is not None
+                else (ing.get("quantity") if ing.get("quantity") is not None else 1.0)
+            )
         )
         try:
             cantidad = float(cant_raw)

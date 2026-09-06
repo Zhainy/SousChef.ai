@@ -219,21 +219,41 @@ async def stream_chat(
                 data={"hash": recipe_hash, "image_url": image_url},
                 event="recipe_image",
             )
-        final_text = text[: _visible_limit(text)].strip()
-        if not final_text and text:
-            try:
-                raw_json = json.loads(text.strip())
-                if isinstance(raw_json, dict) and raw_json.get("mensaje"):
-                    final_text = str(raw_json["mensaje"]).strip()
-            except Exception:
-                pass
-        elif final_text.startswith("{") and final_text.endswith("}"):
-            try:
-                raw_json = json.loads(final_text)
-                if isinstance(raw_json, dict) and raw_json.get("mensaje"):
-                    final_text = str(raw_json["mensaje"]).strip()
-            except Exception:
-                pass
+        if recipe is not None:
+            cleaned_candidate = text[: _visible_limit(text)].strip() or text.strip()
+            if cleaned_candidate.startswith("```"):
+                cleaned_candidate = re.sub(r"^```(?:json)?\s*", "", cleaned_candidate)
+                cleaned_candidate = re.sub(r"\s*```$", "", cleaned_candidate).strip()
+            extracted_msg = None
+            if cleaned_candidate.startswith("{") and cleaned_candidate.endswith("}"):
+                try:
+                    raw_json = json.loads(cleaned_candidate)
+                    if isinstance(raw_json, dict) and raw_json.get("mensaje"):
+                        extracted_msg = str(raw_json["mensaje"]).strip()
+                except Exception:
+                    pass
+            if extracted_msg:
+                final_text = extracted_msg
+            else:
+                final_text = text[: _visible_limit(text)].strip()
+                if not final_text:
+                    final_text = f"¡Aquí tienes la receta de **{recipe['nombre']}**!"
+        else:
+            final_text = text[: _visible_limit(text)].strip()
+            if not final_text and text:
+                try:
+                    cleaned_json = text.strip()
+                    if cleaned_json.startswith("```"):
+                        cleaned_json = re.sub(r"^```(?:json)?\s*", "", cleaned_json)
+                        cleaned_json = re.sub(r"\s*```$", "", cleaned_json)
+                    raw_json = json.loads(cleaned_json)
+                    if isinstance(raw_json, dict) and raw_json.get("mensaje"):
+                        final_text = str(raw_json["mensaje"]).strip()
+                except Exception:
+                    pass
+                if not final_text:
+                    cleaned = re.sub(r"```(?:json)?", "", text).replace("```", "").strip()
+                    final_text = cleaned or "Aquí tienes la sugerencia de cocina:"
         yield ServerSentEvent(data={"message": final_text}, event="done")
     except Exception as exc:  # noqa: BLE001
         yield ServerSentEvent(data={"message": str(exc)}, event="error")
