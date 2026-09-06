@@ -11,7 +11,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from ..config import settings
 from ..schemas import ChatMessage
-from .tools import TOOL_DEFS, execute_tool, openai_tools
+from .tools import TOOL_DEFS, execute_tool, openai_tools, openai_tools_local
 
 RECIPE_FENCE = "```json"
 
@@ -70,26 +70,39 @@ def get_inventario_summary() -> str:
         return "Despensa con ingredientes básicos disponibles."
 
 
-# Prompt compacto para modelos pequeños (Llama 3.2-3B / Qwen local).
-# Más corto y directo: los modelos pequeños siguen mejor instrucciones concisas.
+# Prompt compacto para modelos pequeños (Qwen 2.5 1.5B / Llama 3.2-3B local).
+# Con pocos ejemplos (few-shot) y reglas negativas explícitas para garantizar JSON sin divagaciones.
 SYSTEM_INSTRUCTION_LOCAL = (
-    "Eres SousChef, asistente de cocina inteligente. REGLAS:\n"
-    "1. Sugiere UNA receta usando ÚNICAMENTE los ingredientes disponibles en la despensa indicada.\n"
+    "Eres SousChef, asistente de cocina inteligente.\n"
+    "REGLAS OBLIGATORIAS:\n"
+    "1. Sugiere UNA receta usando ÚNICAMENTE ingredientes disponibles en la despensa indicada.\n"
     "2. NUNCA inventes ingredientes ni superes las cantidades disponibles.\n"
-    "3. Presenta la receta en 1-2 frases amables y OBLIGATORIAMENTE añade al final el bloque JSON así:\n"
+    "3. FORMATO DE SALIDA ESTRICTO: Escribe 1 sola frase breve y amable de presentación, "
+    "e inmediatamente incluye la receta en un bloque JSON con este esquema exacto:\n"
     "```json\n"
-    '{"nombre": "Nombre receta", "resumen": "descripción breve", "tiempo_minutos": 20, '
-    '"ingredientes": [{"nombre": "item", "cantidad": 100, "unidad": "g"}], '
-    '"instrucciones": "1. Primer paso.\\n2. Segundo paso."}\n'
+    '{"nombre": "Nombre receta", "resumen": "Descripción breve", "tiempo_minutos": 25, '
+    '"ingredientes": [{"nombre": "ingrediente", "cantidad": 100, "unidad": "g"}], '
+    '"instrucciones": "1. Paso uno.\\n2. Paso dos."}\n'
     "```\n"
-    "4. Responde siempre en español.\n"
+    "4. REGLA CRÍTICA: PROHIBIDO escribir listas de ingredientes, cantidades o pasos de "
+    "preparación fuera del bloque ```json. Todo el detalle culinario va DENTRO del JSON.\n"
+    "5. Responde siempre en español.\n"
+    "\nEJEMPLO DE RESPUESTA OBLIGATORIO:\n"
+    "¡Hola! Con lo que tienes en tu despensa te sugiero preparar una deliciosa Sopa de Lentejas.\n\n"
+    "```json\n"
+    '{"nombre": "Sopa de Lentejas", "resumen": "Sopa casera nutritiva y reconfortante", '
+    '"tiempo_minutos": 30, '
+    '"ingredientes": [{"nombre": "lentejas", "cantidad": 200, "unidad": "g"}, '
+    '{"nombre": "cebolla", "cantidad": 1, "unidad": "pieza"}], '
+    '"instrucciones": "1. Picar la cebolla y sofreír.\\n2. Añadir las lentejas y agua caliente.'
+    '\\n3. Cocinar a fuego lento durante 25 minutos."}\n'
+    "```\n"
 )
 
 FORCE_RECIPE_HINT = (
-    "\n\n5. El usuario acaba de pedirte la ficha de una receta. Convierte tu respuesta "
-    "anterior al formato de ficha: responde con una presentación breve de 1-2 frases "
-    "seguida del bloque JSON ```json con el esquema indicado. Entrega la receta aunque "
-    "falte algún ingrediente (usa la más cercana con lo disponible)."
+    "\n\n6. El usuario acaba de solicitar la ficha técnica de la receta. "
+    "Entrega de inmediato el bloque ```json con el esquema indicado arriba. "
+    "NO agregues texto narrativo fuera del bloque ```json."
 )
 
 TRANSIENT_CODES = {429, 500, 502, 503}
@@ -285,7 +298,7 @@ async def local_stream(
                 "temperature": 0.2,
             }
             if not force_recipe:
-                payload["tools"] = openai_tools()
+                payload["tools"] = openai_tools_local()
                 payload["tool_choice"] = "auto"
             first_turn = False
             text = ""

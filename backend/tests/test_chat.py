@@ -522,3 +522,78 @@ def test_chat_endpoint_accepts_force_recipe(client, monkeypatch):
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/event-stream")
     assert "event: recipe" in res.text
+
+
+def test_normalize_recipe_nested_and_english():
+    from app.schemas import normalize_recipe
+
+    nested_data = {
+        "mensaje": "¡Hola! Te sugiero una rica Sopa de Lentejas.",
+        "receta": {
+            "name": "Sopa de Lentejas",
+            "summary": "Sopa reconfortante",
+            "time_minutes": 25,
+            "ingredients": [
+                {"name": "lentejas", "amount": 150, "unit": "g"},
+                {"name": "cebolla", "quantity": 1, "unit": "pieza"},
+            ],
+            "instructions": ["Lavar lentejas.", "Cocinar 20 minutos."],
+        },
+    }
+    recipe = normalize_recipe(nested_data)
+    assert recipe is not None
+    assert recipe.nombre == "Sopa de Lentejas"
+    assert recipe.tiempo_minutos == 25
+    assert len(recipe.ingredientes) == 2
+    assert recipe.ingredientes[0].nombre == "lentejas"
+    assert recipe.ingredientes[0].cantidad == 150.0
+    assert "1. Lavar lentejas." in recipe.instrucciones
+
+
+def test_openai_tools_local_excludes_get_inventario():
+    from app.agent.tools import openai_tools_local
+
+    tools = openai_tools_local()
+    tool_names = [t["function"]["name"] for t in tools]
+    assert "get_inventario" not in tool_names
+    assert "descontar_stock" in tool_names
+
+
+def test_stream_chat_handles_unified_json(monkeypatch):
+    from app.agent import agent as agent_mod
+    from app.schemas import ChatMessage
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
+
+    unified_payload = json.dumps({
+        "mensaje": "Te preparé una rica Sopa de Lentejas.",
+        "receta": {
+            "nombre": "Sopa de Lentejas",
+            "resumen": "Nutritiva",
+            "tiempo_minutos": 30,
+            "ingredientes": [{"nombre": "lentejas", "cantidad": 200, "unidad": "g"}],
+            "instrucciones": "1. Hervir.",
+        },
+    })
+
+    async def fake_local_stream(messages, force_recipe=False):
+        yield TurnEvent("text", unified_payload)
+
+    monkeypatch.setattr(agent_mod, "local_stream", fake_local_stream)
+    monkeypatch.setattr(agent_mod.settings, "llm_provider", "local")
+
+    async def _run():
+        events = []
+        async for ev in agent_mod.stream_chat([ChatMessage(role="user", content="cocinar")]):
+            events.append(ev)
+        return events
+
+    events = asyncio.run(_run())
+    event_types = [e.event for e in events]
+    assert "provider_info" in event_types
+    assert "recipe" in event_types
+    assert "done" in event_types
+
+    done_event = next(e for e in events if e.event == "done")
+    assert done_event.data["message"] == "Te preparé una rica Sopa de Lentejas."
+

@@ -22,3 +22,7 @@ override.tf.json
 # Llaves y certificados privados
 *.pem
 *.key
+
+# Planes de ejecucion
+*.tfplan
+tfplan

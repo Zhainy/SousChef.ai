@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "llama-cpp-expert",
+  "owner": "anubhavg-icpl",
+  "repo": "vibe",
+  "path": "skills/llama-cpp-expert",
+  "branch": "master",
+  "sha": "1cd4c595116b71d757f14f2f2e9efc76df968cf3",
+  "source": "manual"
+}

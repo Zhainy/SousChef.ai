@@ -27,9 +27,9 @@ if grep -q "OCI_AUTH_TYPE=api_key" "${APP_DIR}/.env" 2>/dev/null; then
     sed -i 's/OCI_AUTH_TYPE=api_key/OCI_AUTH_TYPE=instance_principal/' "${APP_DIR}/.env"
     echo "   ✓ OCI_AUTH_TYPE actualizado a 'instance_principal' para autenticacion IAM nativa."
 fi
-if grep -q "LLAMA_THREADS=8" "${APP_DIR}/.env" 2>/dev/null; then
-    sed -i 's/LLAMA_THREADS=8/LLAMA_THREADS=4/' "${APP_DIR}/.env"
-    echo "   ✓ LLAMA_THREADS ajustado a 4 para evitar sobrecarga de CPU en ARM."
+if grep -q "LLAMA_THREADS=" "${APP_DIR}/.env" 2>/dev/null; then
+    sed -i 's/LLAMA_THREADS=.*/LLAMA_THREADS=2/' "${APP_DIR}/.env"
+    echo "   ✓ LLAMA_THREADS ajustado a 2 para alinearse con los 2 nucleos fisicos ARM."
 fi
 
 # Detectar IP pública de la instancia en OCI
@@ -48,32 +48,36 @@ done
 if [ "${HAS_MODEL}" -eq 0 ]; then
     echo "   ⚠️  No se encontro ningun archivo .gguf en ${SOUSCHEF_DIR}/models/"
     echo ""
-    echo "   Modelos disponibles para descarga (recomendado primero):"
-    echo "   1) Llama-3.2-3B-Instruct Q4_K_M (~2 GB) [RECOMENDADO]"
-    echo "      → Mas rapido en ARM, function calling nativo, mejor calidad"
-    echo "   2) Qwen2.5-1.5B-Instruct Q4_K_M (~1 GB)"
-    echo "      → Ultra rapido, menor calidad de respuestas"
+    echo "   Modelos disponibles para descarga:"
+    echo "   1) Qwen2.5-1.5B-Instruct Q4_K_M (~1 GB) [RECOMENDADO]"
+    echo "      → Ultra rapido en CPU ARM (~15-20 t/s), excelente en español y JSON"
+    echo "   2) Llama-3.2-3B-Instruct Q4_K_M (~2 GB)"
+    echo "      → Mayor capacidad conversacional, mas lento en CPU (~4-6 t/s)"
     echo "   3) Omitir (la aplicacion usara OCI GenAI como proveedor principal)"
     read -p "   Selecciona una opcion [1/2/3] (por defecto: 1): " MODEL_OPTION
     MODEL_OPTION=${MODEL_OPTION:-1}
 
     if [ "${MODEL_OPTION}" = "1" ]; then
-        MODEL_FILE="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
-        MODEL_URL="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
-        echo "   → Descargando Llama 3.2-3B desde Hugging Face..."
-        curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
-            echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
-        }
-    elif [ "${MODEL_OPTION}" = "2" ]; then
         MODEL_FILE="Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
         MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
         echo "   → Descargando Qwen2.5-1.5B desde Hugging Face..."
         curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
             echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
         }
+        sed -i 's/LOCAL_LLM_MODEL=.*/LOCAL_LLM_MODEL=qwen2.5-1.5b/' "${APP_DIR}/.env" 2>/dev/null || true
+        sed -i 's/LLAMA_MODEL_FILE=.*/LLAMA_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf/' "${APP_DIR}/.env" 2>/dev/null || true
+    elif [ "${MODEL_OPTION}" = "2" ]; then
+        MODEL_FILE="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+        MODEL_URL="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+        echo "   → Descargando Llama 3.2-3B desde Hugging Face..."
+        curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
+            echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
+        }
+        sed -i 's/LOCAL_LLM_MODEL=.*/LOCAL_LLM_MODEL=llama-3.2-3b/' "${APP_DIR}/.env" 2>/dev/null || true
+        sed -i 's/LLAMA_MODEL_FILE=.*/LLAMA_MODEL_FILE=Llama-3.2-3B-Instruct-Q4_K_M.gguf/' "${APP_DIR}/.env" 2>/dev/null || true
     else
         echo "   ℹ️  Continuando sin modelo GGUF local. Podras subirlo mas tarde con:"
-        echo "      scp models/Llama-3.2-3B-Instruct-Q4_K_M.gguf ubuntu@${PUBLIC_IP}:${SOUSCHEF_DIR}/models/"
+        echo "      scp models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf ubuntu@${PUBLIC_IP}:${SOUSCHEF_DIR}/models/"
     fi
 fi
 

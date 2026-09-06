@@ -39,24 +39,34 @@ class StockResult(BaseModel):
 
 def normalize_recipe(data: dict) -> Recipe | None:
     """Coacciona la salida del LLM a un Recipe válido, descartando campos inválidos."""
-    nombre = str(data.get("nombre") or "").strip()
+    # Soporte para respuestas anidadas tipo {"mensaje": "...", "receta": {...}}
+    if isinstance(data.get("receta"), dict):
+        data = data["receta"]
+    elif isinstance(data.get("recipe"), dict):
+        data = data["recipe"]
+
+    nombre = str(data.get("nombre") or data.get("name") or "").strip()
     if not nombre:
         return None
 
     ingredientes: list[RecipeIngredient] = []
-    for ing in data.get("ingredientes") or []:
+    raw_ingredientes = data.get("ingredientes") or data.get("ingredients") or []
+    for ing in raw_ingredientes:
         if not isinstance(ing, dict):
             continue
-        name = str(ing.get("nombre") or "").strip()
+        name = str(ing.get("nombre") or ing.get("name") or "").strip()
         if not name:
             continue
+        cant_raw = ing.get("cantidad") if ing.get("cantidad") is not None else (
+            ing.get("amount") if ing.get("amount") is not None else ing.get("quantity")
+        )
         try:
-            cantidad = float(ing.get("cantidad"))
+            cantidad = float(cant_raw)
         except (TypeError, ValueError):
             continue
         if cantidad <= 0:
             continue
-        unidad = ing.get("unidad")
+        unidad = ing.get("unidad") or ing.get("unit")
         unidad = unidad.strip() if isinstance(unidad, str) and unidad.strip() else None
         ingredientes.append(
             RecipeIngredient(
@@ -68,15 +78,24 @@ def normalize_recipe(data: dict) -> Recipe | None:
     if not ingredientes:
         return None
 
-    resumen = data.get("resumen")
+    resumen = data.get("resumen") or data.get("summary") or data.get("description")
     resumen = resumen.strip() if isinstance(resumen, str) and resumen.strip() else None
+    tiempo_raw = data.get("tiempo_minutos") if data.get("tiempo_minutos") is not None else (
+        data.get("prep_time") or data.get("time_minutes") or data.get("tiempo")
+    )
     try:
-        tiempo = int(data.get("tiempo_minutos"))
+        tiempo = int(tiempo_raw)
     except (TypeError, ValueError):
         tiempo = None
     if tiempo is not None and not 1 <= tiempo <= 1440:
         tiempo = None
-    instrucciones = data.get("instrucciones")
+    instrucciones = data.get("instrucciones") or data.get("instructions") or data.get("pasos")
+    if isinstance(instrucciones, list):
+        steps = [
+            f"{idx + 1}. {p}" if not str(p).startswith(f"{idx + 1}.") else str(p)
+            for idx, p in enumerate(instrucciones)
+        ]
+        instrucciones = "\n".join(steps)
     instrucciones = (
         instrucciones.strip() if isinstance(instrucciones, str) and instrucciones.strip() else None
     )

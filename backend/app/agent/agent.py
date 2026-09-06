@@ -13,45 +13,63 @@ from .llm import AIProviderError, local_stream, oci_stream
 
 
 def _extract_recipe(text: str) -> dict | None:
+    # 1. Bloque de código markdown ```json { ... } ```
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    candidate = match.group(1) if match else _last_json_object(text)
-    if candidate is None:
-        return None
-    try:
-        data = json.loads(candidate)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    recipe = normalize_recipe(data)
-    return recipe.model_dump() if recipe is not None else None
+    if match:
+        try:
+            data = json.loads(match.group(1))
+            if isinstance(data, dict):
+                recipe = normalize_recipe(data)
+                if recipe is not None:
+                    return recipe.model_dump()
+        except json.JSONDecodeError:
+            pass
 
+    # 2. Si el texto completo es un objeto JSON
+    stripped = text.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            data = json.loads(stripped)
+            if isinstance(data, dict):
+                recipe = normalize_recipe(data)
+                if recipe is not None:
+                    return recipe.model_dump()
+        except json.JSONDecodeError:
+            pass
 
-def _last_json_object(text: str) -> str | None:
-    start = text.rfind("{")
-    if start == -1:
-        return None
-    depth = 0
-    in_string = False
-    escape = False
-    for i in range(start, len(text)):
-        ch = text[i]
-        if in_string:
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start : i + 1]
+    # 3. Buscar cualquier objeto JSON balanceado en el texto
+    for start in [m.start() for m in re.finditer(r"\{", text)]:
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start : i + 1]
+                    try:
+                        data = json.loads(candidate)
+                        if isinstance(data, dict):
+                            recipe = normalize_recipe(data)
+                            if recipe is not None:
+                                return recipe.model_dump()
+                    except json.JSONDecodeError:
+                        pass
+                    break
+
     return None
 
 
@@ -201,7 +219,21 @@ async def stream_chat(
                 data={"hash": recipe_hash, "image_url": image_url},
                 event="recipe_image",
             )
-        final_text = text[: _visible_limit(text)]
+        final_text = text[: _visible_limit(text)].strip()
+        if not final_text and text:
+            try:
+                raw_json = json.loads(text.strip())
+                if isinstance(raw_json, dict) and raw_json.get("mensaje"):
+                    final_text = str(raw_json["mensaje"]).strip()
+            except Exception:
+                pass
+        elif final_text.startswith("{") and final_text.endswith("}"):
+            try:
+                raw_json = json.loads(final_text)
+                if isinstance(raw_json, dict) and raw_json.get("mensaje"):
+                    final_text = str(raw_json["mensaje"]).strip()
+            except Exception:
+                pass
         yield ServerSentEvent(data={"message": final_text}, event="done")
     except Exception as exc:  # noqa: BLE001
         yield ServerSentEvent(data={"message": str(exc)}, event="error")

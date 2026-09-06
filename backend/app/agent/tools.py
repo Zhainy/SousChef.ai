@@ -49,6 +49,17 @@ def openai_tools() -> list[dict[str, Any]]:
     return [{"type": "function", "function": dict(d)} for d in TOOL_DEFS]
 
 
+def openai_tools_local() -> list[dict[str, Any]]:
+    """Herramientas locales: excluye get_inventario (ya presente en prompt)
+    para evitar turnos redundantes.
+    """
+    return [
+        {"type": "function", "function": dict(d)}
+        for d in TOOL_DEFS
+        if d["name"] != "get_inventario"
+    ]
+
+
 def get_inventario() -> dict[str, Any]:
     with Session(engine) as session:
         items = list(
