@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">SousChef.ai - Asistente Culinario con IA Híbrida</title>
+  <desc id="hero-desc">Despensa inteligente y asistente culinario con arquitectura de IA híbrida (OCI Llama 3.3 70B y llama.cpp local fallback), tool calling en tiempo real y deducción atómica de inventario.</desc>
+
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0e1b12" />
+      <stop offset="50%" stop-color="#142619" />
+      <stop offset="100%" stop-color="#1a3022" />
+    </linearGradient>
+    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e8a33d" />
+      <stop offset="100%" stop-color="#f4c471" />
+    </linearGradient>
+    <linearGradient id="card-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#172e1e" />
+      <stop offset="100%" stop-color="#112216" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="1200" height="420" rx="20" fill="url(#bg-grad)" stroke="#2e513c" stroke-width="1.5" />
+
+  <!-- Background decorative grid lines -->
+  <g opacity="0.08" stroke="#faf6ec" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="420" />
+    <line x1="300" y1="0" x2="300" y2="420" />
+    <line x1="500" y1="0" x2="500" y2="420" />
+    <line x1="700" y1="0" x2="700" y2="420" />
+    <line x1="900" y1="0" x2="900" y2="420" />
+    <line x1="1100" y1="0" x2="1100" y2="420" />
+    <line x1="0" y1="100" x2="1200" y2="100" />
+    <line x1="0" y1="210" x2="1200" y2="210" />
+    <line x1="0" y1="320" x2="1200" y2="320" />
+  </g>
+
+  <!-- Left Block: Identity, Brand & Value Proposition -->
+  <g transform="translate(56, 44)">
+    <!-- Eyebrow Pill -->
+    <g>
+      <rect width="320" height="30" rx="15" fill="#1e3a29" stroke="#3f6b4f" stroke-width="1" />
+      <!-- Small Cooking Pot Icon -->
+      <g transform="translate(14, 7) scale(0.35)">
+        <path d="M6 14h20v3H6z" fill="#e8a33d" opacity="0.85" />
+        <path d="M6 17h20c0 5-2 8-10 8S6 22 6 17z" fill="#e8a33d" />
+        <circle cx="5" cy="14" r="1.5" fill="#e8a33d" />
+        <circle cx="27" cy="14" r="1.5" fill="#e8a33d" />
+        <path d="M12 9c0-1.5 1-2 1-3.5" stroke="#f4c471" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M19 8.5c0-1.5 1-2 1-3.5" stroke="#f4c471" stroke-width="2" stroke-linecap="round" fill="none" />
+      </g>
+      <text x="36" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#f4c471" letter-spacing="1">HYBRID AI CULINARY ASSISTANT</text>
+    </g>
+
+    <!-- Main Title -->
+    <text x="0" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="900" fill="#faf6ec" letter-spacing="-1">SousChef<tspan fill="#e8a33d">.ai</tspan></text>
+
+    <!-- Tagline & Description -->
+    <text x="0" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#e9e1cc">Despensa inteligente y asistente de cocina con IA Híbrida.</text>
+    <text x="0" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="400" fill="#9dbda4">Valida stock atómicamente, sugiere recetas con Tool Calling y costo $0.</text>
+
+    <!-- Architectural Highlights Badges -->
+    <g transform="translate(0, 182)">
+      <!-- Badge 1: Cloud -->
+      <rect width="186" height="34" rx="8" fill="#172e1e" stroke="#2e513c" stroke-width="1" />
+      <circle cx="16" cy="17" r="4" fill="#558a63" />
+      <text x="28" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" font-weight="600" fill="#c5d7c8">OCI Llama 3.3 70B</text>
+
+      <!-- Badge 2: Local Fallback -->
+      <g transform="translate(196, 0)">
+        <rect width="186" height="34" rx="8" fill="#172e1e" stroke="#2e513c" stroke-width="1" />
+        <circle cx="16" cy="17" r="4" fill="#e8a33d" />
+        <text x="28" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" font-weight="600" fill="#c5d7c8">llama.cpp Qwen 3.5</text>
+      </g>
+
+      <!-- Badge 3: Tool Calling -->
+      <g transform="translate(392, 0)">
+        <rect width="168" height="34" rx="8" fill="#172e1e" stroke="#2e513c" stroke-width="1" />
+        <text x="14" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" font-weight="600" fill="#f4c471">⚡ Tool Calling SSE</text>
+      </g>
+    </g>
+
+    <!-- Interactive Callout / Demo Banner -->
+    <g transform="translate(0, 238)">
+      <rect width="560" height="64" rx="12" fill="#1a3022" stroke="#e8a33d" stroke-width="1.5" />
+      <!-- Link icon -->
+      <path d="M24 32a6 6 0 0 1 6-6h6a6 6 0 0 1 0 12h-6a6 6 0 0 1-6-6zm16 0a6 6 0 0 1 6-6h6a6 6 0 0 1 0 12h-6a6 6 0 0 1-6-6z" stroke="#e8a33d" stroke-width="2" fill="none" stroke-linecap="round" />
+      <text x="70" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#f4c471" letter-spacing="0.5">DEMO EN PRODUCCIÓN ACTIVA</text>
+      <text x="70" y="48" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" fill="#faf6ec">https://souschef-ai.duckdns.org</text>
+
+      <!-- Status Tag -->
+      <g transform="translate(436, 17)">
+        <rect width="108" height="30" rx="6" fill="#22402f" stroke="#558a63" stroke-width="1" />
+        <circle cx="14" cy="15" r="4" fill="#558a63" />
+        <text x="24" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#faf6ec">ONLINE v1.0</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Right Block: Real UI/Proof Orchestration Card -->
+  <g transform="translate(668, 36)" filter="url(#shadow)">
+    <!-- Terminal/Card Shell -->
+    <rect width="476" height="348" rx="16" fill="url(#card-grad)" stroke="#2e513c" stroke-width="1.5" />
+
+    <!-- Window Header -->
+    <rect width="476" height="38" rx="16" fill="#132417" />
+    <path d="M0 24h476v14H0z" fill="#132417" />
+    <circle cx="24" cy="19" r="5" fill="#d85a3f" />
+    <circle cx="40" cy="19" r="5" fill="#e8a33d" />
+    <circle cx="56" cy="19" r="5" fill="#558a63" />
+    <text x="76" y="24" font-family="ui-monospace, monospace" font-size="12" fill="#9dbda4">agent@souschef-ai ~ live-session</text>
+    
+    <!-- Health status badge -->
+    <rect x="340" y="10" width="120" height="20" rx="4" fill="#1c3624" />
+    <circle cx="352" cy="20" r="3.5" fill="#558a63" />
+    <text x="362" y="24" font-family="ui-monospace, monospace" font-size="10" font-weight="600" fill="#c5d7c8">OCI Primary: OK</text>
+
+    <!-- Step 1: Inventory Card -->
+    <g transform="translate(20, 52)">
+      <rect width="436" height="74" rx="10" fill="#182e1f" stroke="#254730" stroke-width="1" />
+      <text x="14" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="800" fill="#9dbda4" letter-spacing="1">DESPENSA ACTUAL (SQLite)</text>
+      <!-- Ingredient badges -->
+      <g transform="translate(14, 32)">
+        <rect width="124" height="28" rx="6" fill="#22402f" />
+        <text x="10" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#faf6ec">🍅 Tomates: 4 un</text>
+
+        <rect x="132" width="134" height="28" rx="6" fill="#22402f" />
+        <text x="142" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#faf6ec">🍝 Pasta Penne: 250g</text>
+
+        <rect x="274" width="134" height="28" rx="6" fill="#22402f" />
+        <text x="284" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#faf6ec">🌿 Albahaca: 1 atado</text>
+      </g>
+    </g>
+
+    <!-- Step 2: Tool Calling Action -->
+    <g transform="translate(20, 138)">
+      <rect width="436" height="82" rx="10" fill="#142619" stroke="#3f6b4f" stroke-width="1.2" />
+      <text x="14" y="22" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#f4c471">⚙ Tool Call: get_inventario()</text>
+      <text x="14" y="42" font-family="ui-monospace, monospace" font-size="11" fill="#c5d7c8">→ Validando disponibilidad de ingredientes...</text>
+      <text x="14" y="64" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#558a63">✔ Receta validada: Penne al Pomodoro con Albahaca</text>
+    </g>
+
+    <!-- Step 3: Atomic Stock Deduction Result -->
+    <g transform="translate(20, 232)">
+      <rect width="436" height="96" rx="10" fill="#1d3725" stroke="#e8a33d" stroke-width="1.2" />
+      <g transform="translate(14, 18)">
+        <circle cx="10" cy="10" r="10" fill="#e8a33d" />
+        <text x="7" y="14" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="900" fill="#142619">✓</text>
+        <text x="30" y="14" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#faf6ec">¡A Cocinar! (Deducción Atómica)</text>
+      </g>
+      <text x="44" y="58" font-family="ui-monospace, monospace" font-size="11" fill="#e9e1cc">descontar_stock(tomates=4, penne=250g, albahaca=1)</text>
+      <text x="44" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#f4c471">Stock sincronizado en UI Vue 3 vía SSE</text>
+    </g>
+  </g>
+</svg>

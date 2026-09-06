@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">SousChef.ai - Arquitectura de IA Híbrida y Alta Disponibilidad</title>
+  <desc id="arch-desc">Diagrama de arquitectura técnica mostrando el cliente Vue 3, Nginx con SSL y SSE, FastAPI backend, SQLite, capa de IA híbrida con OCI Llama 3.3 70B primario y llama.cpp local de fallback, junto al pipeline de imágenes TheMealDB y Unsplash.</desc>
+
+  <defs>
+    <linearGradient id="arch-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c1710" />
+      <stop offset="100%" stop-color="#142619" />
+    </linearGradient>
+    <linearGradient id="node-client" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a28" />
+      <stop offset="100%" stop-color="#162c1e" />
+    </linearGradient>
+    <linearGradient id="node-backend" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#244431" />
+      <stop offset="100%" stop-color="#182e21" />
+    </linearGradient>
+    <linearGradient id="node-cloud" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2c4d37" />
+      <stop offset="100%" stop-color="#1b3323" />
+    </linearGradient>
+    <linearGradient id="node-local" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#36321d" />
+      <stop offset="100%" stop-color="#211e10" />
+    </linearGradient>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#558a63" />
+    </marker>
+    <marker id="arrow-gold" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#e8a33d" />
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#9dbda4" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="460" rx="18" fill="url(#arch-bg)" stroke="#2e513c" stroke-width="1.5" />
+
+  <!-- Section Header -->
+  <g transform="translate(50, 36)">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#f4c471" letter-spacing="1.2">DIAGRAMA DE ARQUITECTURA TÉCNICA</text>
+    <text y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#faf6ec">Capa de Alta Disponibilidad con IA Híbrida (Cloud + Edge)</text>
+  </g>
+
+  <!-- 1. Client Browser -->
+  <g transform="translate(50, 95)">
+    <rect width="250" height="150" rx="12" fill="url(#node-client)" stroke="#3f6b4f" stroke-width="1.5" />
+    <rect width="250" height="32" rx="12" fill="#132417" />
+    <path d="M0 20h250v12H0z" fill="#132417" />
+    <circle cx="16" cy="16" r="4" fill="#d85a3f" />
+    <circle cx="28" cy="16" r="4" fill="#e8a33d" />
+    <circle cx="40" cy="16" r="4" fill="#558a63" />
+    <text x="56" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="700" fill="#faf6ec">Client SPA (Vue 3)</text>
+    
+    <text x="16" y="58" font-family="ui-monospace, monospace" font-size="12" font-weight="600" fill="#c5d7c8">• Vue 3 Composition API</text>
+    <text x="16" y="80" font-family="ui-monospace, monospace" font-size="12" font-weight="600" fill="#c5d7c8">• TypeScript &amp; Pinia Store</text>
+    <text x="16" y="102" font-family="ui-monospace, monospace" font-size="12" font-weight="600" fill="#c5d7c8">• Tailwind CSS v4 UI</text>
+    <text x="16" y="124" font-family="ui-monospace, monospace" font-size="12" font-weight="600" fill="#f4c471">• EventSource SSE Stream</text>
+  </g>
+
+  <!-- Arrow Client -> Nginx -->
+  <path d="M300 170 L360 170" stroke="#558a63" stroke-width="2" marker-end="url(#arrow-green)" fill="none" />
+  <text x="306" y="162" font-family="ui-monospace, monospace" font-size="10" fill="#9dbda4">HTTPS / SSE</text>
+
+  <!-- 2. Nginx Reverse Proxy -->
+  <g transform="translate(366, 95)">
+    <rect width="200" height="150" rx="12" fill="url(#node-client)" stroke="#3f6b4f" stroke-width="1.5" />
+    <rect width="200" height="32" rx="12" fill="#132417" />
+    <path d="M0 20h200v12H0z" fill="#132417" />
+    <text x="16" y="21" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="700" fill="#faf6ec">Nginx Reverse Proxy</text>
+    
+    <text x="16" y="58" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">• SSL Let's Encrypt</text>
+    <text x="16" y="80" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">• Proxy Buffering OFF</text>
+    <text x="16" y="102" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">• SPA Dist Serving (/*)</text>
+    <text x="16" y="124" font-family="ui-monospace, monospace" font-size="12" fill="#f4c471">• API Routing (/api/)</text>
+  </g>
+
+  <!-- Arrow Nginx -> Backend -->
+  <path d="M566 170 L626 170" stroke="#558a63" stroke-width="2" marker-end="url(#arrow-green)" fill="none" />
+  <text x="572" y="162" font-family="ui-monospace, monospace" font-size="10" fill="#9dbda4">HTTP :8000</text>
+
+  <!-- 3. FastAPI Backend Core -->
+  <g transform="translate(632, 70)">
+    <rect width="230" height="200" rx="12" fill="url(#node-backend)" stroke="#558a63" stroke-width="2" />
+    <rect width="230" height="32" rx="12" fill="#172e1e" />
+    <path d="M0 20h230v12H0z" fill="#172e1e" />
+    <text x="16" y="21" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#faf6ec">FastAPI Backend Core</text>
+
+    <text x="16" y="56" font-family="ui-monospace, monospace" font-size="12" font-weight="600" fill="#faf6ec">• Python 3.12 + uv</text>
+    <text x="16" y="76" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">• Tool Calling Engine</text>
+    <text x="16" y="96" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">• Atomic Stock Txns</text>
+    <text x="16" y="116" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">• SQLite (SQLModel DB)</text>
+    <text x="16" y="140" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#f4c471">ORQUESTADOR DE IA:</text>
+    <text x="16" y="160" font-family="ui-monospace, monospace" font-size="11" fill="#e9e1cc">Automatic Failover</text>
+    <text x="16" y="180" font-family="ui-monospace, monospace" font-size="11" fill="#9dbda4">Circuit Breaker &amp; Retry</text>
+  </g>
+
+  <!-- Connector to SQLite DB storage -->
+  <g transform="translate(632, 290)">
+    <rect width="230" height="42" rx="8" fill="#112216" stroke="#2e513c" stroke-width="1" />
+    <text x="16" y="26" font-family="ui-monospace, monospace" font-size="12" fill="#c5d7c8">💾 Storage: SQLite (/data/souschef.db)</text>
+  </g>
+  <path d="M747 270 L747 290" stroke="#558a63" stroke-width="1.5" marker-end="url(#arrow-green)" fill="none" />
+
+  <!-- Arrows from Backend to Hybrid Providers -->
+  <!-- Upper line to Cloud Primary -->
+  <path d="M862 130 L930 110" stroke="#558a63" stroke-width="2" marker-end="url(#arrow-green)" fill="none" />
+  <text x="866" y="105" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#558a63">1. PRIMARIO</text>
+
+  <!-- Lower line to Local Fallback -->
+  <path d="M862 200 L930 220" stroke="#e8a33d" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arrow-gold)" fill="none" />
+  <text x="860" y="235" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#f4c471">2. FAILOVER (Auto)</text>
+
+  <!-- 4A. Cloud Primary: OCI Generative AI -->
+  <g transform="translate(936, 60)">
+    <rect width="214" height="110" rx="12" fill="url(#node-cloud)" stroke="#558a63" stroke-width="2" />
+    <rect width="214" height="28" rx="12" fill="#1a3322" />
+    <path d="M0 16h214v12H0z" fill="#1a3322" />
+    <circle cx="14" cy="14" r="4" fill="#558a63" />
+    <text x="24" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="800" fill="#faf6ec">OCI Generative AI (Cloud)</text>
+
+    <text x="14" y="48" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#faf6ec">Llama 3.3 70B Instruct</text>
+    <text x="14" y="68" font-family="ui-monospace, monospace" font-size="11" fill="#c5d7c8">• Hosted in OCI Cloud</text>
+    <text x="14" y="86" font-family="ui-monospace, monospace" font-size="11" fill="#9dbda4">• Instance Principal Auth</text>
+    <text x="14" y="102" font-family="ui-monospace, monospace" font-size="10" fill="#f4c471">Alta capacidad de razonamiento</text>
+  </g>
+
+  <!-- 4B. Edge / Local LLM: llama.cpp -->
+  <g transform="translate(936, 186)">
+    <rect width="214" height="110" rx="12" fill="url(#node-local)" stroke="#e8a33d" stroke-width="2" />
+    <rect width="214" height="28" rx="12" fill="#292410" />
+    <path d="M0 16h214v12H0z" fill="#292410" />
+    <circle cx="14" cy="14" r="4" fill="#e8a33d" />
+    <text x="24" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="800" fill="#faf6ec">llama.cpp Server (Local)</text>
+
+    <text x="14" y="48" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#faf6ec">Qwen 3.5 4B GGUF</text>
+    <text x="14" y="68" font-family="ui-monospace, monospace" font-size="11" fill="#d8cba9">• OCI Ampere A1 (ARM64)</text>
+    <text x="14" y="86" font-family="ui-monospace, monospace" font-size="11" fill="#d8cba9">• Fallback transparente</text>
+    <text x="14" y="102" font-family="ui-monospace, monospace" font-size="10" fill="#f4c471">Inferencia offline / costo $0</text>
+  </g>
+
+  <!-- 5. Bottom Panel: Zero-Cost Culinary Image Pipeline -->
+  <g transform="translate(50, 350)">
+    <rect width="1100" height="85" rx="12" fill="#132418" stroke="#2e513c" stroke-width="1.2" />
+    <text x="20" y="26" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="800" fill="#f4c471" letter-spacing="1">PIPELINE DE IMÁGENES GASTRONÓMICAS ($0 COSTO EN API KEYS)</text>
+    
+    <!-- Flow badges -->
+    <g transform="translate(20, 38)">
+      <rect width="240" height="34" rx="6" fill="#1b3323" />
+      <text x="12" y="22" font-family="ui-monospace, monospace" font-size="12" fill="#faf6ec">1. TheMealDB (Traducción)</text>
+
+      <path d="M246 17 L270 17" stroke="#558a63" stroke-width="1.5" marker-end="url(#arrow-green)" />
+
+      <g transform="translate(276, 0)">
+        <rect width="230" height="34" rx="6" fill="#1b3323" />
+        <text x="12" y="22" font-family="ui-monospace, monospace" font-size="12" fill="#faf6ec">2. Unsplash Source Fallback</text>
+      </g>
+
+      <path d="M512 17 L536 17" stroke="#558a63" stroke-width="1.5" marker-end="url(#arrow-green)" />
+
+      <g transform="translate(542, 0)">
+        <rect width="240" height="34" rx="6" fill="#1b3323" />
+        <text x="12" y="22" font-family="ui-monospace, monospace" font-size="12" fill="#faf6ec">3. Caché Local en Disco (/data)</text>
+      </g>
+
+      <path d="M788 17 L812 17" stroke="#558a63" stroke-width="1.5" marker-end="url(#arrow-green)" />
+
+      <g transform="translate(818, 0)">
+        <rect width="240" height="34" rx="6" fill="#2a2512" stroke="#e8a33d" stroke-width="1" />
+        <text x="12" y="22" font-family="ui-monospace, monospace" font-size="12" fill="#f4c471">4. Fallback Dinámico en SVG</text>
+      </g>
+    </g>
+  </g>
+</svg>

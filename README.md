@@ -1,86 +1,101 @@
-# SousChef.ai
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="SousChef.ai - Despensa Inteligente &amp; Asistente Culinario con IA Híbrida">
+</p>
 
-Despensa inteligente y asistente de cocina con Inteligencia Artificial Híbrida. Cuenta con CRUD de ingredientes en Vue 3 y un agente que valida el inventario en tiempo real mediante Tool Calling, sugiere recetas aprovechando los ingredientes disponibles y descuenta el stock atómicamente al cocinar.
-
-La arquitectura de IA utiliza un modelo **híbrido con alta disponibilidad y costo $0**:
-1. **OCI Generative AI (Llama 3.3 70B)** como proveedor primario en la nube.
-2. **llama.cpp local (Qwen 3.5 4B GGUF)** como motor de inferencia local o fallback automático transparente ante fallas de red, timeout o agotamiento de cuota.
-
-Las imágenes de las recetas se obtienen mediante un pipeline gratuito sin API keys (TheMealDB con traducción gastronómica automática + Unsplash Source), almacenadas en caché local y respaldadas por placeholders SVG.
+<p align="center">
+  <a href="https://souschef-ai.duckdns.org"><img src="https://img.shields.io/badge/Demo_en_Vivo-souschef--ai.duckdns.org-e8a33d?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo"></a>
+  <img src="https://img.shields.io/badge/Release-v1.0-142619?style=for-the-badge&logo=github&logoColor=f4c471" alt="Release v1.0">
+  <img src="https://img.shields.io/badge/OCI-Always_Free_ARM64-F80000?style=for-the-badge&logo=oracle&logoColor=white" alt="OCI Always Free">
+  <img src="https://img.shields.io/badge/Backend_Tests-64%20passed-558a63?style=for-the-badge&logo=pytest&logoColor=white" alt="Backend Tests">
+  <img src="https://img.shields.io/badge/Frontend_Tests-73%20passed-558a63?style=for-the-badge&logo=vitest&logoColor=white" alt="Frontend Tests">
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/Vue.js-3.5_TypeScript-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white" alt="Vue 3">
+</p>
 
 ---
 
-## Stack Tecnológico
+> [!TIP]
+> ### 🌐 **Prueba la Demo en Producción:** [https://souschef-ai.duckdns.org](https://souschef-ai.duckdns.org)
+> Accede a la instancia en vivo desplegada en Oracle Cloud Infrastructure (Always Free). Administra la despensa, chatea con el asistente en tiempo real y cocina recetas con deducción atómica de inventario.
 
-- **Backend**: Python 3.12, FastAPI, SQLModel / SQLite, `oci-openai`, httpx, uv, Ruff, pytest
-- **Frontend**: Vue 3 (Composition API, TypeScript), Pinia, Vue Router, Tailwind CSS, `marked` + `dompurify`, Vite, vitest
-- **LLM Primario**: [OCI Generative AI](https://docs.oracle.com/en-us/iaas/Content/generative-ai/overview.htm) (`meta.llama-3.3-70b-instruct`)
-- **LLM Local / Fallback**: [llama.cpp](https://github.com/ggml-org/llama.cpp) (`llama-server`) con `Qwen3.5-4B-Q4_K_M.gguf`
-- **Infraestructura**: Oracle Cloud Infrastructure (OCI) Always Free (Ampere A1 Flex ARM64, 2 OCPU, 12 GB RAM), Terraform, Docker Compose multi-arch, Nginx Reverse Proxy con SSL automático (Certbot / Let's Encrypt).
+---
+
+## ¿Qué es SousChef.ai?
+
+**SousChef.ai** es una plataforma integral de gestión de despensa y asistencia culinaria impulsada por una arquitectura de **IA Híbrida con alta disponibilidad y costo $0 de inferencia**. 
+
+Permite controlar existencias de alimentos mediante una interfaz moderna en Vue 3 y colaborar con un agente culinario inteligente que inspecciona el inventario en tiempo real mediante **Tool Calling**, propone recetas personalizadas basadas estrictamente en lo disponible y descuenta los ingredientes utilizados de manera atómica al momento de cocinar.
+
+### Pilares del Proyecto
+
+- **Despensa en Tiempo Real**: CRUD reactivo con categorización, alertas de stock mínimo y sincronización de unidades de medida.
+- **Agente con Tool Calling Autónomo**: El modelo de lenguaje consulta la despensa (`get_inventario`) y ejecuta transacciones de stock (`descontar_stock`) de forma transparente sin inventar ingredientes que el usuario no tiene.
+- **IA Híbrida Resiliente (Cloud + Edge)**:
+  1. **Primario**: [OCI Generative AI](https://docs.oracle.com/en-us/iaas/Content/generative-ai/overview.htm) (`Llama 3.3 70B Instruct`) para razonamiento culinario avanzado en la nube.
+  2. **Fallback Local**: [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Qwen 3.5 4B GGUF`) alojado en el propio servidor ARM64 para conmutación automática y transparente ante fallas de red, latencia o cuota.
+- **Pipeline Gastronómico sin Costo ($0 API Keys)**: Búsqueda y enriquecimiento de imágenes gastronómicas combinando TheMealDB con traducción culinaria y Unsplash Source, con caché persistente en disco y respaldo dinámico en SVG.
+- **Deducción de Stock Atómica**: Control estricto de concurrencia e integridad en SQLite mediante transacciones normalizadas.
 
 ---
 
 ## Arquitectura de la Solución
 
-```
-                                  ┌───────────────────────────┐
-                                  │   Browser / Client (Vue)  │
-                                  └─────────────┬─────────────┘
-                                                │ HTTPS / SSE
-                                                ▼
-                                  ┌───────────────────────────┐
-                                  │    Nginx Reverse Proxy    │
-                                  └──────┬─────────────┬──────┘
-                                         │             │
-                    /api/ & /static/     │             │ /*
-                                         ▼             ▼
-                    ┌─────────────────────────┐   ┌───────────────────────────┐
-                    │  FastAPI Backend (:8000)│   │ Frontend Dist (HTML/JS/CSS│
-                    └────────────┬────────────┘   └───────────────────────────┘
-                                 │
-                   ┌─────────────┴─────────────┐
-                   │  Capa de IA Híbrida       │
-                   ▼                           ▼
-      ┌─────────────────────────┐ ┌───────────────────────────┐
-      │   OCI Generative AI     │ │ llama.cpp Server (:8080)  │
-      │  (Llama 3.3 70B Cloud)  │ │ (Qwen 3.5 4B Local/VM)   │
-      │  [Proveedor Primario]   │ │ [Fallback Automático]     │
-      └─────────────────────────┘ └───────────────────────────┘
-```
+<p align="center">
+  <img src="./assets/readme/architecture.svg" width="100%" alt="Diagrama de Arquitectura de SousChef.ai">
+</p>
 
-### Secuencia de Eventos SSE en el Chat
-El endpoint `POST /api/chat` emite eventos Server-Sent Events (SSE) en tiempo real:
-- `provider_info`: Indica si responde OCI (`oci`) o el modelo local (`local`, y si fue activación por fallback).
-- `token`: Texto incremental en streaming.
-- `tool_call` / `tool_result`: Ejecución de herramientas (`get_inventario`, `descontar_stock`).
-- `recipe`: Objeto estructurado de la receta normalizada (ingredientes, pasos, porciones).
-- `recipe_image`: URL de la imagen generada o resuelta.
-- `done`: Fin de la respuesta y mensaje final formateado.
+### Protocolo de Streaming SSE (`POST /api/chat`)
+
+La comunicación entre el cliente y el agente se realiza vía **Server-Sent Events (SSE)** con soporte de streaming token a token y retroalimentación interactiva del estado:
+
+| Evento SSE | Descripción | Payload |
+|---|---|---|
+| `provider_info` | Indica qué proveedor de IA está respondiendo y si se activó fallback | `{"provider": "oci" \| "local", "fallback": boolean}` |
+| `token` | Fragmento incremental de texto generado en streaming | `{"text": "..."}` |
+| `tool_call` | Notifica la invocación de una herramienta por parte del agente | `{"tool": "get_inventario" \| "descontar_stock", "args": {...}}` |
+| `tool_result` | Resultado de la ejecución de la herramienta en el backend | `{"status": "ok", "data": [...]}` |
+| `recipe` | Estructura canónica de la receta generada para la UI | `{"nombre": "...", "ingredientes": [...], "pasos": [...]}` |
+| `recipe_image` | URL o path de la imagen gastronómica resuelta | `{"url": "/static/recipes/..."}` |
+| `done` | Cierre exitoso de la sesión de inferencia | `{"status": "complete"}` |
+
+---
+
+## Stack Tecnológico
+
+| Capa | Tecnologías |
+|---|---|
+| **Frontend** | Vue 3 (Composition API con `<script setup>`), TypeScript, Pinia, Vue Router, Tailwind CSS, `marked` + `dompurify`, Vite, Vitest |
+| **Backend** | Python 3.12, FastAPI, SQLModel (SQLite), `oci-openai`, httpx, uv, Ruff, Pytest |
+| **IA Primaria** | OCI Generative AI Service (`meta.llama-3.3-70b-instruct`) con autenticación Instance Principal |
+| **IA Local / Edge** | llama.cpp (`llama-server`) corriendo `Qwen3.5-4B-Q4_K_M.gguf` optimizado para ARM64 Neon |
+| **Infraestructura** | Oracle Cloud Infrastructure (OCI) Always Free (Ampere A1 Flex ARM64, 2 OCPU, 12 GB RAM) |
+| **DevOps & Proxy** | Terraform, Docker Compose multi-arch, Nginx Reverse Proxy con SSL automático (Certbot / Let's Encrypt) |
 
 ---
 
 ## Configuración de Entorno
 
-Copia el archivo de variables de ejemplo:
+Copia la plantilla de variables de entorno y ajusta los parámetros necesarios:
+
 ```bash
 cp .env.example .env
 ```
 
-Variables disponibles en `.env`:
+### Variables en `.env`
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `LLM_PROVIDER` | `oci` | Proveedor activo (`oci` o `local`) |
-| `AI_FALLBACK_ENABLED` | `true` | Activa fallback automático a llama.cpp si OCI falla |
-| `OCI_COMPARTMENT_ID` | — | OCID de tu compartment en OCI |
-| `OCI_REGION` | `us-ashburn-1` | Región de OCI |
-| `OCI_MODEL_ID` | `meta.llama-3.3-70b-instruct` | Modelo en OCI Generative AI |
-| `OCI_AUTH_TYPE` | `api_key` | `api_key` (desarrollo local) o `instance_principal` (en VM OCI) |
+| `LLM_PROVIDER` | `oci` | Proveedor primario activo (`oci` o `local`) |
+| `AI_FALLBACK_ENABLED` | `true` | Conmutación automática a `llama.cpp` si OCI presenta fallas o timeout |
+| `OCI_COMPARTMENT_ID` | — | OCID del Compartment en Oracle Cloud |
+| `OCI_REGION` | `us-ashburn-1` | Región configurada en OCI |
+| `OCI_MODEL_ID` | `meta.llama-3.3-70b-instruct` | Identificador del modelo fundacional en OCI |
+| `OCI_AUTH_TYPE` | `api_key` | `api_key` (desarrollo local) o `instance_principal` (en instancia VM de OCI) |
 | `LOCAL_LLM_BASE_URL` | `http://llama-cpp:8080/v1` | Endpoint compatible OpenAI de llama.cpp |
 | `LOCAL_LLM_MODEL` | `qwen3.5-4b` | Identificador del modelo local |
-| `IMAGE_SOURCE` | `web` | `web` (TheMealDB + Unsplash) o `none` (tests) |
-| `DATABASE_URL` | `sqlite:////data/souschef.db` | Ruta a la base de datos SQLite |
-| `ALLOW_ORIGINS` | `http://localhost` | Orígenes permitidos para CORS |
+| `IMAGE_SOURCE` | `web` | `web` (TheMealDB + Unsplash) o `none` (modo offline/tests) |
+| `DATABASE_URL` | `sqlite:////data/souschef.db` | Ruta de la base de datos persistente SQLite |
+| `ALLOW_ORIGINS` | `http://localhost,https://souschef-ai.duckdns.org` | Orígenes habilitados para CORS |
 
 ---
 
@@ -88,95 +103,101 @@ Variables disponibles en `.env`:
 
 ### Opción A: Con Docker Compose (Recomendada)
 
-1. Descarga el modelo GGUF recomendado si deseas usar el LLM local:
+1. **Descarga del modelo GGUF (opcional para inferencia local):**
    ```bash
    mkdir -p models
-   # Coloca Qwen3.5-4B-Q4_K_M.gguf en el directorio models/
+   # Ubica Qwen3.5-4B-Q4_K_M.gguf en el directorio models/
    ```
 
-2. Inicia todo el stack (Backend, Frontend y llama.cpp):
+2. **Iniciar todos los servicios (Backend, Frontend y llama.cpp):**
    ```bash
    docker compose up --build
    ```
-   Abre [http://localhost](http://localhost) en tu navegador.
+   Accede a [http://localhost](http://localhost) en tu navegador.
 
-### Opción B: Ejecución Bare-Metal (Nativo)
+### Opción B: Ejecución Nativa (Bare-Metal)
 
-1. **LLM Local (Opcional con GPU host):**
+1. **Motor LLM Local (opcional):**
    ```bash
    ./scripts/serve_local.sh
    ```
 
-2. **Backend:**
+2. **Backend (FastAPI con `uv`):**
    ```bash
    cd backend
    uv sync
    uv run fastapi dev
    ```
+   Disponible en [http://localhost:8000](http://localhost:8000) (Swagger en `/docs`).
 
-3. **Frontend:**
+3. **Frontend (Vite + Vue 3):**
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
-   Abre [http://localhost:5173](http://localhost:5173).
+   Disponible en [http://localhost:5173](http://localhost:5173).
 
 ---
 
-## Despliegue en OCI (Always Free)
+## Despliegue en Producción (Oracle Cloud Always Free)
 
-La infraestructura está 100% automatizada con **Terraform** para correr sin costo en el tier Always Free de Oracle Cloud (Compute Ampere A1 ARM64).
+La infraestructura en la nube está completamente automatizada con **Terraform** para ejecutarse de forma permanente sin costo en el tier Always Free de Oracle Cloud (Ampere A1 ARM64).
 
-### Pre-requisitos
-- Cuenta activa en Oracle Cloud Infrastructure (OCI).
-- OCI CLI y Terraform >= 1.5 instalados localmente.
-- Dominio propio con acceso a la gestión de registros DNS.
+```
+VCN (10.0.0.0/16) ──► Subred Pública ──► Security Lists (80, 443, 22)
+                           │
+                           ▼
+             Instancia Ampere A1 ARM64 (2 OCPU / 12 GB RAM)
+             ├── Dynamic Group + IAM Policy (Instance Principal)
+             ├── Nginx + Certbot Let's Encrypt (SSL Auto-renew)
+             ├── FastAPI Backend Container
+             └── llama.cpp Server Container (Qwen 3.5 4B ARM64)
+```
 
-### Paso a paso
+### Pasos de Despliegue
 
-1. **Configurar variables de Terraform:**
+1. **Provisionar Infraestructura con Terraform:**
    ```bash
    cd terraform
    cp terraform.tfvars.example terraform.tfvars
-   ```
-   Edita `terraform.tfvars` con tus OCIDs (`tenancy_ocid`, `user_ocid`, etc.) y tu llave pública SSH.
-
-2. **Provisionar la infraestructura:**
-   ```bash
+   # Completa tus credenciales de OCI y clave SSH pública
    terraform init
    terraform apply
    ```
-   Terraform creará la VCN, subred pública, security lists, Dynamic Group e IAM Policy para Instance Principal, además de la instancia Ampere A1 (2 OCPU / 12 GB RAM) con Docker preinstalado.
 
-3. **Subir el modelo GGUF a la instancia:**
+2. **Transferir el modelo GGUF a la instancia:**
    ```bash
-   scp ../models/Qwen3.5-4B-Q4_K_M.gguf opc@<IP_PUBLICA_INSTANCIA>:/opt/souschef/models/
+   scp ../models/Qwen3.5-4B-Q4_K_M.gguf opc@<IP_PUBLICA>:/opt/souschef/models/
    ```
 
-4. **Configurar registro DNS:**
-   Crea un registro **A** en tu proveedor de dominio apuntando a la IP pública de la instancia.
+3. **Configuración de Dominio (DNS):**
+   Crea un registro **A** apuntando el dominio (ej. `souschef-ai.duckdns.org`) a la IP pública de la instancia.
 
-5. **Ejecutar script de despliegue en la instancia:**
+4. **Despliegue y Emisión SSL:**
    ```bash
-   ssh opc@<IP_PUBLICA_INSTANCIA>
+   ssh opc@<IP_PUBLICA>
    bash /opt/souschef/app/scripts/deploy_oci.sh
    ```
-   El script configurará los directorios, obtendrá el certificado SSL con Let's Encrypt y levantará el stack de producción con `docker-compose.prod.yml`.
 
-Tu aplicación estará disponible en `https://tudominio.com` con renovación automática de certificados SSL.
+La plataforma quedará operativa en `https://souschef-ai.duckdns.org` con renovación automática de certificados SSL.
 
 ---
 
-## Comandos de Calidad y Tests
+## Verificación de Calidad y Tests
+
+El proyecto cuenta con una cobertura de pruebas exhaustiva tanto en el backend como en el frontend:
 
 ```bash
-# Tests unitarios y de integración del Backend (51 tests)
+# Backend: Tests unitarios, de integración y tool calling (64 tests)
 cd backend && uv run pytest
 
-# Verificación de tipos y linter
+# Backend: Linter y formato de código con Ruff
 cd backend && uv run ruff check .
 
-# Tests unitarios del Frontend (73 tests)
+# Frontend: Tests unitarios de componentes, stores y vistas (73 tests)
 cd frontend && npm test -- --run
+
+# Frontend: Chequeo estricto de tipos con vue-tsc
+cd frontend && npm run type-check
 ```
