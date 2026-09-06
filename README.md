@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="SousChef.ai - Despensa Inteligente &amp; Asistente Culinario con IA Híbrida">
+  <img src="./assets/readme/hero.svg?v=1.0.1" width="100%" alt="SousChef.ai - Despensa Inteligente &amp; Asistente Culinario con IA Híbrida">
 </p>
 
 <p align="center">
@@ -42,7 +42,7 @@ Permite controlar existencias de alimentos mediante una interfaz moderna en Vue 
 ## Arquitectura de la Solución
 
 <p align="center">
-  <img src="./assets/readme/architecture.svg" width="100%" alt="Diagrama de Arquitectura de SousChef.ai">
+  <img src="./assets/readme/architecture.svg?v=1.0.1" width="100%" alt="Diagrama de Arquitectura de SousChef.ai">
 </p>
 
 ### Protocolo de Streaming SSE (`POST /api/chat`)

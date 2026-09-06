@@ -2,7 +2,7 @@
 
 > **Versión:** 1.0  
 > **Fecha:** Septiembre 2026  
-> **Stack actual:** FastAPI · SQLModel/SQLite · Vue 3 · Tailwind v4 · llama.cpp / Qwen3.5  
+> **Stack actual:** FastAPI · SQLModel/SQLite · Vue 3 · Tailwind v4 · llama.cpp / Qwen 2.5 1.5B  
 > **Objetivo:** Migrar a una arquitectura containerizada con Docker Compose, desplegable en OCI Always Free (ARM A1), con IA híbrida (OCI Generative AI primario + llama.cpp fallback) e HTTPS via Let's Encrypt.
 
 ---
@@ -293,7 +293,7 @@ OCI_TIMEOUT_SECONDS=30
 # ── llama.cpp (fallback) ──────────────────────────────────────────────────────
 # En Docker Compose, el nombre del servicio es "llama-cpp"
 LOCAL_LLM_BASE_URL=http://llama-cpp:8080/v1
-LOCAL_LLM_MODEL=qwen3.5-4b
+LOCAL_LLM_MODEL=qwen2.5-1.5b
 
 # ── Imágenes de recetas ───────────────────────────────────────────────────────
 # Valores: web | none (none desactiva la búsqueda, útil para tests)
@@ -513,7 +513,7 @@ montado como volumen — nunca dentro de la imagen.
 ```dockerfile
 FROM ghcr.io/ggml-org/llama.cpp:server
 
-ENV MODEL_PATH=/models/Qwen3.5-4B-Q4_K_M.gguf
+ENV MODEL_PATH=/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
 ENV LLAMA_PORT=8080
 ENV LLAMA_CTX=8192
 ENV LLAMA_THREADS=4
@@ -648,7 +648,7 @@ services:
     volumes:
       - ${MODELS_DIR:-./models}:/models
     environment:
-      MODEL_PATH: /models/${LLAMA_MODEL_FILE:-Qwen3.5-4B-Q4_K_M.gguf}
+      MODEL_PATH: /models/${LLAMA_MODEL_FILE:-Qwen2.5-1.5B-Instruct-Q4_K_M.gguf}
     ports:
       - "8080:8080"
 
@@ -822,7 +822,7 @@ output "instance_public_ip" {
 output "next_steps" {
   value = <<-EOT
     1. Subir el modelo GGUF:
-       scp Qwen3.5-4B-Q4_K_M.gguf opc@${oci_core_instance.souschef.public_ip}:/opt/souschef/models/
+       scp Qwen2.5-1.5B-Instruct-Q4_K_M.gguf opc@${oci_core_instance.souschef.public_ip}:/opt/souschef/models/
     2. Conectar a la instancia:
        ssh opc@${oci_core_instance.souschef.public_ip}
     3. Configurar el .env y arrancar el stack (ver scripts/deploy_oci.sh)
@@ -881,7 +881,7 @@ echo "→ Verificando que el modelo GGUF existe..."
 if [ -z "$(ls -A ${SOUSCHEF_DIR}/models/*.gguf 2>/dev/null)" ]; then
     echo "⚠️  No se encontró archivo .gguf en ${SOUSCHEF_DIR}/models/"
     echo "   Subir el modelo antes de continuar:"
-    echo "   scp Qwen3.5-4B-Q4_K_M.gguf opc@<IP>:${SOUSCHEF_DIR}/models/"
+    echo "   scp Qwen2.5-1.5B-Instruct-Q4_K_M.gguf opc@<IP>:${SOUSCHEF_DIR}/models/"
     exit 1
 fi
 
@@ -924,7 +924,7 @@ echo "✓ SousChef.ai desplegado en https://${DOMAIN}"
    cd terraform && terraform init && terraform apply
 
 3. **Subir el modelo GGUF a la instancia:**
-   scp Qwen3.5-4B-Q4_K_M.gguf opc@$(terraform output -raw instance_public_ip):/opt/souschef/models/
+   scp Qwen2.5-1.5B-Instruct-Q4_K_M.gguf opc@$(terraform output -raw instance_public_ip):/opt/souschef/models/
 
 4. **Apuntar el DNS del dominio a la IP pública:**
    terraform output instance_public_ip
@@ -1051,7 +1051,7 @@ Se usan **2 OCPU y 12 GB RAM** (conservador) en lugar del máximo (4 OCPU / 24 G
 2. Permitir agregar una segunda instancia en el futuro (el cupo total es 4 OCPU / 24 GB
    compartidos entre todas las instancias A1 del tenancy).
 
-El modelo `Qwen3.5-4B-Q4_K_M.gguf` (~2.5 GB) consume ~3 GB de RAM en runtime, cómodo
+El modelo `Qwen2.5-1.5B-Instruct-Q4_K_M.gguf` (~1 GB) consume ~1.5 GB de RAM en runtime, óptimo para ARM64
 dentro de los 12 GB asignados.
 
 ---
