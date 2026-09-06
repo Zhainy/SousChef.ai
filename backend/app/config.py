@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # ── llama.cpp local (fallback) ─────────────────────────────────────────
     # En Docker Compose el nombre del servicio es "llama-cpp"
     local_llm_base_url: str = "http://llama-cpp:8080/v1"
-    local_llm_model: str = "qwen3.5-4b"
+    local_llm_model: str = "llama-3.2-3b"
 
     # ── Imágenes de recetas ────────────────────────────────────────────────
     # "web"  → TheMealDB + Unsplash (gratuito, sin API key)

@@ -37,21 +37,33 @@ done
 
 if [ "${HAS_MODEL}" -eq 0 ]; then
     echo "   ⚠️  No se encontro ningun archivo .gguf en ${SOUSCHEF_DIR}/models/"
-    echo "      Opciones para el modelo de fallback:"
-    echo "      1) Descargar Qwen3.5-4B-Q4_K_M (~2.5 GB) directamente desde Hugging Face ahora"
-    echo "      2) Omitir por ahora (la aplicacion usara OCI GenAI como proveedor principal)"
-    read -p "   Selecciona una opcion [1/2] (por defecto: 2): " MODEL_OPTION
-    MODEL_OPTION=${MODEL_OPTION:-2}
+    echo ""
+    echo "   Modelos disponibles para descarga (recomendado primero):"
+    echo "   1) Llama-3.2-3B-Instruct Q4_K_M (~2 GB) [RECOMENDADO]"
+    echo "      → Mas rapido en ARM, function calling nativo, mejor calidad"
+    echo "   2) Qwen2.5-1.5B-Instruct Q4_K_M (~1 GB)"
+    echo "      → Ultra rapido, menor calidad de respuestas"
+    echo "   3) Omitir (la aplicacion usara OCI GenAI como proveedor principal)"
+    read -p "   Selecciona una opcion [1/2/3] (por defecto: 1): " MODEL_OPTION
+    MODEL_OPTION=${MODEL_OPTION:-1}
 
     if [ "${MODEL_OPTION}" = "1" ]; then
-        echo "   → Descargando modelo desde Hugging Face (conexion de alta velocidad OCI)..."
-        curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/Qwen3.5-4B-Q4_K_M.gguf" \
-            "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf" || {
-            echo "   ⚠️ No se pudo completar la descarga automatica. Continuando sin modelo local."
+        MODEL_FILE="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+        MODEL_URL="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+        echo "   → Descargando Llama 3.2-3B desde Hugging Face..."
+        curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
+            echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
+        }
+    elif [ "${MODEL_OPTION}" = "2" ]; then
+        MODEL_FILE="Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
+        MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+        echo "   → Descargando Qwen2.5-1.5B desde Hugging Face..."
+        curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
+            echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
         }
     else
         echo "   ℹ️  Continuando sin modelo GGUF local. Podras subirlo mas tarde con:"
-        echo "      scp models/Qwen3.5-4B-Q4_K_M.gguf ubuntu@${PUBLIC_IP}:${SOUSCHEF_DIR}/models/"
+        echo "      scp models/Llama-3.2-3B-Instruct-Q4_K_M.gguf ubuntu@${PUBLIC_IP}:${SOUSCHEF_DIR}/models/"
     fi
 fi
 

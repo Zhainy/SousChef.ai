@@ -1,6 +1,8 @@
 FROM ghcr.io/ggml-org/llama.cpp:server
 
-ENV MODEL_PATH=/models/Qwen3.5-4B-Q4_K_M.gguf
+# Modelo por defecto: Llama 3.2-3B-Instruct Q4_K_M
+# (más rápido y mejor function calling que Qwen 3.5-4B en ARM)
+ENV MODEL_PATH=/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
 ENV LLAMA_PORT=8080
 ENV LLAMA_CTX=8192
 ENV LLAMA_THREADS=8

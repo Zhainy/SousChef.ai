@@ -23,9 +23,8 @@ services:
     volumes:
       - ${MODELS_DIR:-./models}:/models
     environment:
-      MODEL_PATH: /models/${LLAMA_MODEL_FILE:-Qwen3.5-4B-Q4_K_M.gguf}
+      MODEL_PATH: /models/${LLAMA_MODEL_FILE:-Llama-3.2-3B-Instruct-Q4_K_M.gguf}
       LLAMA_THREADS: ${LLAMA_THREADS:-8}
-      LLAMA_ARG_THINK_BUDGET: ${LLAMA_THINK_BUDGET:-128}
 
   frontend:
     build: ./frontend
