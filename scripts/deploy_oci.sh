@@ -36,48 +36,27 @@ fi
 PUBLIC_IP=$(curl -s -m 5 https://ifconfig.me || curl -s -m 5 https://api.ipify.org || echo "IP_PUBLICA")
 
 echo "→ 3. Verificando modelo GGUF para fallback local (llama.cpp)..."
-HAS_MODEL=0
-for model_file in "${SOUSCHEF_DIR}"/models/*.gguf; do
-    if [ -f "${model_file}" ]; then
-        HAS_MODEL=1
-        echo "   ✓ Modelo detectado: $(basename "${model_file}")"
-        break
-    fi
-done
+if ls "${SOUSCHEF_DIR}"/models/*.gguf 1>/dev/null 2>&1; then
+    echo "   Modelos disponibles en ${SOUSCHEF_DIR}/models/:"
+    for m in "${SOUSCHEF_DIR}"/models/*.gguf; do
+        echo "   - $(basename "${m}")"
+    done
+fi
 
-if [ "${HAS_MODEL}" -eq 0 ]; then
-    echo "   ⚠️  No se encontro ningun archivo .gguf en ${SOUSCHEF_DIR}/models/"
+if [ ! -f "${SOUSCHEF_DIR}/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf" ]; then
     echo ""
-    echo "   Modelos disponibles para descarga:"
-    echo "   1) Qwen2.5-1.5B-Instruct Q4_K_M (~1 GB) [RECOMENDADO]"
-    echo "      → Ultra rapido en CPU ARM (~15-20 t/s), excelente en español y JSON"
-    echo "   2) Llama-3.2-3B-Instruct Q4_K_M (~2 GB)"
-    echo "      → Mayor capacidad conversacional, mas lento en CPU (~4-6 t/s)"
-    echo "   3) Omitir (la aplicacion usara OCI GenAI como proveedor principal)"
-    read -p "   Selecciona una opcion [1/2/3] (por defecto: 1): " MODEL_OPTION
-    MODEL_OPTION=${MODEL_OPTION:-1}
-
-    if [ "${MODEL_OPTION}" = "1" ]; then
+    echo "   💡 Modelo de alta velocidad recomendado: Qwen2.5-1.5B-Instruct Q4_K_M (~1 GB, 15-20 t/s en ARM)"
+    read -p "   ¿Deseas descargarlo ahora para optimizar el rendimiento? [S/n]: " DOWNLOAD_QWEN
+    DOWNLOAD_QWEN=${DOWNLOAD_QWEN:-S}
+    if [[ "${DOWNLOAD_QWEN}" =~ ^[sSyY]$ ]]; then
         MODEL_FILE="Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
         MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
         echo "   → Descargando Qwen2.5-1.5B desde Hugging Face..."
         curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
-            echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
+            echo "   ⚠️ No se pudo completar la descarga. Continuando con el modelo actual."
         }
         sed -i 's/LOCAL_LLM_MODEL=.*/LOCAL_LLM_MODEL=qwen2.5-1.5b/' "${APP_DIR}/.env" 2>/dev/null || true
         sed -i 's/LLAMA_MODEL_FILE=.*/LLAMA_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf/' "${APP_DIR}/.env" 2>/dev/null || true
-    elif [ "${MODEL_OPTION}" = "2" ]; then
-        MODEL_FILE="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
-        MODEL_URL="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
-        echo "   → Descargando Llama 3.2-3B desde Hugging Face..."
-        curl -L --progress-bar -o "${SOUSCHEF_DIR}/models/${MODEL_FILE}" "${MODEL_URL}" || {
-            echo "   ⚠️ No se pudo completar la descarga. Continuando sin modelo local."
-        }
-        sed -i 's/LOCAL_LLM_MODEL=.*/LOCAL_LLM_MODEL=llama-3.2-3b/' "${APP_DIR}/.env" 2>/dev/null || true
-        sed -i 's/LLAMA_MODEL_FILE=.*/LLAMA_MODEL_FILE=Llama-3.2-3B-Instruct-Q4_K_M.gguf/' "${APP_DIR}/.env" 2>/dev/null || true
-    else
-        echo "   ℹ️  Continuando sin modelo GGUF local. Podras subirlo mas tarde con:"
-        echo "      scp models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf ubuntu@${PUBLIC_IP}:${SOUSCHEF_DIR}/models/"
     fi
 fi
 
@@ -105,13 +84,25 @@ if [ "${ACCESS_MODE}" = "1" ]; then
     read -p "   Ingresa tu email para Let's Encrypt: " EMAIL
     EMAIL=${EMAIL:-"admin@${DOMAIN}"}
 
-    echo "   → Obteniendo certificado SSL gratuito con Certbot para ${DOMAIN}..."
-    docker run --rm \
-        -v "${SOUSCHEF_DIR}/certbot/conf:/etc/letsencrypt" \
-        -v "${SOUSCHEF_DIR}/certbot/www:/var/www/certbot" \
-        -p 80:80 \
-        certbot/certbot certonly --standalone \
-        -d "${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}"
+    # 1. Verificar si el certificado para este dominio ya existe
+    if [ -f "${SOUSCHEF_DIR}/certbot/conf/live/${DOMAIN}/fullchain.pem" ]; then
+        echo "   ✓ Certificado SSL ya existente para ${DOMAIN}. Omitiendo solicitud a Let's Encrypt."
+    else
+        echo "   → Obteniendo certificado SSL gratuito con Certbot para ${DOMAIN}..."
+        # Liberar el puerto 80 si algún contenedor ya lo está ocupando (ej. frontend anterior)
+        RUNNING_PORT_80=$(docker ps -q --filter "publish=80" || true)
+        if [ -n "${RUNNING_PORT_80}" ]; then
+            echo "   → Liberando puerto 80 temporalmente (deteniendo contenedor)..."
+            docker stop ${RUNNING_PORT_80} 2>/dev/null || true
+        fi
+
+        docker run --rm \
+            -v "${SOUSCHEF_DIR}/certbot/conf:/etc/letsencrypt" \
+            -v "${SOUSCHEF_DIR}/certbot/www:/var/www/certbot" \
+            -p 80:80 \
+            certbot/certbot certonly --standalone \
+            -d "${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}"
+    fi
 
     # Crear enlace simbolico relativo para que funcione tanto en host como dentro del contenedor Docker
     (cd "${SOUSCHEF_DIR}/certbot/conf/live" && ln -sfn "${DOMAIN}" "souschef-cert")
