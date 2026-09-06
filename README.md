@@ -5,6 +5,7 @@
 <p align="center">
   <a href="https://souschef-ai.duckdns.org"><img src="https://img.shields.io/badge/Demo_en_Vivo-souschef--ai.duckdns.org-e8a33d?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo"></a>
   <img src="https://img.shields.io/badge/Release-v1.0-142619?style=for-the-badge&logo=github&logoColor=f4c471" alt="Release v1.0">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/OCI-Always_Free_ARM64-F80000?style=for-the-badge&logo=oracle&logoColor=white" alt="OCI Always Free">
   <img src="https://img.shields.io/badge/Backend_Tests-64%20passed-558a63?style=for-the-badge&logo=pytest&logoColor=white" alt="Backend Tests">
   <img src="https://img.shields.io/badge/Frontend_Tests-73%20passed-558a63?style=for-the-badge&logo=vitest&logoColor=white" alt="Frontend Tests">
@@ -32,7 +33,7 @@ Permite controlar existencias de alimentos mediante una interfaz moderna en Vue 
 - **Agente con Tool Calling Autónomo**: El modelo de lenguaje consulta la despensa (`get_inventario`) y ejecuta transacciones de stock (`descontar_stock`) de forma transparente sin inventar ingredientes que el usuario no tiene.
 - **IA Híbrida Resiliente (Cloud + Edge)**:
   1. **Primario**: [OCI Generative AI](https://docs.oracle.com/en-us/iaas/Content/generative-ai/overview.htm) (`Llama 3.3 70B Instruct`) para razonamiento culinario avanzado en la nube.
-  2. **Fallback Local**: [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Qwen 3.5 4B GGUF`) alojado en el propio servidor ARM64 para conmutación automática y transparente ante fallas de red, latencia o cuota.
+  2. **Fallback Local**: [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Qwen 2.5 1.5B Instruct GGUF`) alojado en el propio servidor ARM64 para conmutación automática y transparente ante fallas de red, latencia o cuota.
 - **Pipeline Gastronómico sin Costo ($0 API Keys)**: Búsqueda y enriquecimiento de imágenes gastronómicas combinando TheMealDB con traducción culinaria y Unsplash Source, con caché persistente en disco y respaldo dinámico en SVG.
 - **Deducción de Stock Atómica**: Control estricto de concurrencia e integridad en SQLite mediante transacciones normalizadas.
 
@@ -67,7 +68,7 @@ La comunicación entre el cliente y el agente se realiza vía **Server-Sent Even
 | **Frontend** | Vue 3 (Composition API con `<script setup>`), TypeScript, Pinia, Vue Router, Tailwind CSS, `marked` + `dompurify`, Vite, Vitest |
 | **Backend** | Python 3.12, FastAPI, SQLModel (SQLite), `oci-openai`, httpx, uv, Ruff, Pytest |
 | **IA Primaria** | OCI Generative AI Service (`meta.llama-3.3-70b-instruct`) con autenticación Instance Principal |
-| **IA Local / Edge** | llama.cpp (`llama-server`) corriendo `Qwen3.5-4B-Q4_K_M.gguf` optimizado para ARM64 Neon |
+| **IA Local / Edge** | llama.cpp (`llama-server`) corriendo `Qwen2.5-1.5B-Instruct-Q4_K_M.gguf` optimizado para ARM64 Neon |
 | **Infraestructura** | Oracle Cloud Infrastructure (OCI) Always Free (Ampere A1 Flex ARM64, 2 OCPU, 12 GB RAM) |
 | **DevOps & Proxy** | Terraform, Docker Compose multi-arch, Nginx Reverse Proxy con SSL automático (Certbot / Let's Encrypt) |
 
@@ -92,7 +93,7 @@ cp .env.example .env
 | `OCI_MODEL_ID` | `meta.llama-3.3-70b-instruct` | Identificador del modelo fundacional en OCI |
 | `OCI_AUTH_TYPE` | `api_key` | `api_key` (desarrollo local) o `instance_principal` (en instancia VM de OCI) |
 | `LOCAL_LLM_BASE_URL` | `http://llama-cpp:8080/v1` | Endpoint compatible OpenAI de llama.cpp |
-| `LOCAL_LLM_MODEL` | `qwen3.5-4b` | Identificador del modelo local |
+| `LOCAL_LLM_MODEL` | `qwen2.5-1.5b` | Identificador del modelo local |
 | `IMAGE_SOURCE` | `web` | `web` (TheMealDB + Unsplash) o `none` (modo offline/tests) |
 | `DATABASE_URL` | `sqlite:////data/souschef.db` | Ruta de la base de datos persistente SQLite |
 | `ALLOW_ORIGINS` | `http://localhost,https://souschef-ai.duckdns.org` | Orígenes habilitados para CORS |
@@ -106,7 +107,7 @@ cp .env.example .env
 1. **Descarga del modelo GGUF (opcional para inferencia local):**
    ```bash
    mkdir -p models
-   # Ubica Qwen3.5-4B-Q4_K_M.gguf en el directorio models/
+   # Ubica Qwen2.5-1.5B-Instruct-Q4_K_M.gguf en el directorio models/
    ```
 
 2. **Iniciar todos los servicios (Backend, Frontend y llama.cpp):**
@@ -152,7 +153,7 @@ VCN (10.0.0.0/16) ──► Subred Pública ──► Security Lists (80, 443, 2
              ├── Dynamic Group + IAM Policy (Instance Principal)
              ├── Nginx + Certbot Let's Encrypt (SSL Auto-renew)
              ├── FastAPI Backend Container
-             └── llama.cpp Server Container (Qwen 3.5 4B ARM64)
+             └── llama.cpp Server Container (Qwen 2.5 1.5B ARM64)
 ```
 
 ### Pasos de Despliegue
@@ -168,7 +169,7 @@ VCN (10.0.0.0/16) ──► Subred Pública ──► Security Lists (80, 443, 2
 
 2. **Transferir el modelo GGUF a la instancia:**
    ```bash
-   scp ../models/Qwen3.5-4B-Q4_K_M.gguf opc@<IP_PUBLICA>:/opt/souschef/models/
+   scp ../models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf opc@<IP_PUBLICA>:/opt/souschef/models/
    ```
 
 3. **Configuración de Dominio (DNS):**
@@ -201,3 +202,9 @@ cd frontend && npm test -- --run
 # Frontend: Chequeo estricto de tipos con vue-tsc
 cd frontend && npm run type-check
 ```
+
+---
+
+## Licencia
+
+Distribuido bajo la Licencia **MIT**. Consulta el archivo [LICENSE](LICENSE) para más información.

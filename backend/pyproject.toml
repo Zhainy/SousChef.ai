@@ -2,6 +2,7 @@
 name = "souschef-backend"
 version = "1.0.0"
 description = "Backend de SousChef.ai: despensa + agente IA con Tool Calling"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]",
