@@ -19,3 +19,10 @@ backend/static/recipes/
 # Volúmenes locales de Docker
 data/
 models/
+
+# Tareas efímeras de desarrollo
+tasks/
+
+# Tooling y skills de agentes de IA
+.agents/
+skills-lock.json
