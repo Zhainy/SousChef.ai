@@ -22,6 +22,16 @@ if [ ! -f "${APP_DIR}/.env" ]; then
     echo "   ✓ Se ha creado ${APP_DIR}/.env desde .env.example."
 fi
 
+# Asegurar configuraciones optimizadas para la VM de OCI
+if grep -q "OCI_AUTH_TYPE=api_key" "${APP_DIR}/.env" 2>/dev/null; then
+    sed -i 's/OCI_AUTH_TYPE=api_key/OCI_AUTH_TYPE=instance_principal/' "${APP_DIR}/.env"
+    echo "   ✓ OCI_AUTH_TYPE actualizado a 'instance_principal' para autenticacion IAM nativa."
+fi
+if grep -q "LLAMA_THREADS=8" "${APP_DIR}/.env" 2>/dev/null; then
+    sed -i 's/LLAMA_THREADS=8/LLAMA_THREADS=4/' "${APP_DIR}/.env"
+    echo "   ✓ LLAMA_THREADS ajustado a 4 para evitar sobrecarga de CPU en ARM."
+fi
+
 # Detectar IP pública de la instancia en OCI
 PUBLIC_IP=$(curl -s -m 5 https://ifconfig.me || curl -s -m 5 https://api.ipify.org || echo "IP_PUBLICA")
 

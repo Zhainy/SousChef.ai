@@ -4,8 +4,8 @@ FROM ghcr.io/ggml-org/llama.cpp:server
 # (más rápido y mejor function calling que Qwen 3.5-4B en ARM)
 ENV MODEL_PATH=/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
 ENV LLAMA_PORT=8080
-ENV LLAMA_CTX=8192
-ENV LLAMA_THREADS=8
+ENV LLAMA_CTX=4096
+ENV LLAMA_THREADS=4
 
 # Nota: LLAMA_ARG_REASONING=on se deshabilita porque el modo think de Qwen
 # con budget reducido interfiere con el function calling y hace que el modelo

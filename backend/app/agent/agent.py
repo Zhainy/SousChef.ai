@@ -178,10 +178,6 @@ async def stream_chat(
             yield ServerSentEvent(data={"message": str(fallback_exc)}, event="error")
             return
 
-    except Exception as exc:  # noqa: BLE001
-        yield ServerSentEvent(data={"message": str(exc)}, event="error")
-        return
-
     # Si por alguna razón el stream terminó sin eventos y sin haber emitido provider_info
     if not provider_info_emitted:
         actual_provider = settings.ai_fallback_provider if used_fallback else provider

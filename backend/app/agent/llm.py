@@ -50,26 +50,43 @@ SYSTEM_INSTRUCTION = (
     "solo a través del mecanismo de tool_calls de la API.\n"
 )
 
-# Prompt compacto para modelos pequeños (Qwen 4B / local).
+def get_inventario_summary() -> str:
+    """Devuelve un resumen compacto del inventario para prompts de modelos locales."""
+    try:
+        from sqlmodel import Session, select
+        from ..db import engine
+        from ..models import Ingredient
+
+        with Session(engine) as session:
+            items = list(
+                session.exec(
+                    select(Ingredient).where(Ingredient.cantidad > 0).order_by(Ingredient.nombre)
+                ).all()
+            )
+        if not items:
+            return "Despensa vacía."
+        return ", ".join(f"{i.nombre} ({i.cantidad} {i.unidad})" for i in items)
+    except Exception:
+        return "Despensa con ingredientes básicos disponibles."
+
+
+# Prompt compacto para modelos pequeños (Llama 3.2-3B / Qwen local).
 # Más corto y directo: los modelos pequeños siguen mejor instrucciones concisas.
 SYSTEM_INSTRUCTION_LOCAL = (
-    "Eres SousChef, asistente de cocina. REGLAS:\n"
-    "1. Si el usuario pide recetas o quiere saber qué cocinar: "
-    "llama a get_inventario() ANTES de responder. NUNCA inventes ingredientes.\n"
-    "2. Con el inventario obtenido, sugiere UNA receta posible. "
-    "Escribe 1-2 frases de presentación y luego el bloque JSON exactamente así:\n"
+    "Eres SousChef, asistente de cocina inteligente. REGLAS:\n"
+    "1. Sugiere UNA receta usando ÚNICAMENTE los ingredientes disponibles en la despensa indicada.\n"
+    "2. NUNCA inventes ingredientes ni superes las cantidades disponibles.\n"
+    "3. Presenta la receta en 1-2 frases amables y OBLIGATORIAMENTE añade al final el bloque JSON así:\n"
     "```json\n"
     '{"nombre": "Nombre receta", "resumen": "descripción breve", "tiempo_minutos": 20, '
     '"ingredientes": [{"nombre": "item", "cantidad": 100, "unidad": "g"}], '
     '"instrucciones": "1. Primer paso.\\n2. Segundo paso."}\n'
     "```\n"
-    "3. No uses más cantidad de un ingrediente de la disponible en inventario.\n"
-    "4. Solo llama a descontar_stock() si el usuario dice que va a cocinar esa receta.\n"
-    "5. Responde siempre en español.\n"
+    "4. Responde siempre en español.\n"
 )
 
 FORCE_RECIPE_HINT = (
-    "\n\n6. El usuario acaba de pedirte la ficha de una receta. Convierte tu respuesta "
+    "\n\n5. El usuario acaba de pedirte la ficha de una receta. Convierte tu respuesta "
     "anterior al formato de ficha: responde con una presentación breve de 1-2 frases "
     "seguida del bloque JSON ```json con el esquema indicado. Entrega la receta aunque "
     "falte algún ingrediente (usa la más cercana con lo disponible)."
@@ -184,14 +201,11 @@ async def _post_stream(
     client: httpx.AsyncClient, url: str, payload: dict[str, Any]
 ) -> AsyncIterator[dict[str, Any]]:
     target_urls = []
-    # Si la URL usa el hostname de docker 'llama-cpp', priorizar host.docker.internal
-    # para aprovechar la GPU del host si ./scripts/serve_local.sh está corriendo
+    # Conectar directamente a la URL configurada (llama-cpp en Docker)
+    target_urls.append(url)
     if "://llama-cpp:" in url:
         target_urls.append(url.replace("://llama-cpp:", "://host.docker.internal:"))
-        target_urls.append(url)
         target_urls.append(url.replace("://llama-cpp:", "://127.0.0.1:"))
-    else:
-        target_urls.append(url)
 
     last_error: Exception | None = None
     for target_url in target_urls:
@@ -235,10 +249,20 @@ async def local_stream(
     force_recipe: bool = False,
 ) -> AsyncIterator[TurnEvent]:
     owns_client = client is None
-    http = client or httpx.AsyncClient(timeout=None)
+    # Timeout de 90s para evitar bloqueos infinitos en CPU
+    http = client or httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=10.0, read=90.0, write=10.0, pool=5.0)
+    )
 
-    # Prompt compacto para modelos pequeños (Qwen 4B): sigue mejor instrucciones cortas
-    system = SYSTEM_INSTRUCTION_LOCAL + (FORCE_RECIPE_HINT if force_recipe else "")
+    # Inyectar el inventario actual directamente en el prompt del sistema.
+    # Así los modelos pequeños (3B) tienen el stock a la vista sin requerir
+    # múltiples turnos de tool calls lentos en CPU.
+    inv_summary = get_inventario_summary()
+    system = (
+        SYSTEM_INSTRUCTION_LOCAL
+        + f"\nIngredientes en despensa: {inv_summary}\n"
+        + (FORCE_RECIPE_HINT if force_recipe else "")
+    )
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     messages += [{"role": m.role, "content": m.content} for m in history if m.content]
 
@@ -250,33 +274,19 @@ async def local_stream(
             "content": "Entrega la ficha técnica de la receta en formato JSON con el esquema solicitado.",
         })
 
-    # Verificar si ya se llamó get_inventario en el historial de la conversación
-    # (mensajes de tipo 'tool' indican que hubo tool calls anteriores)
-    inventario_ya_consultado = any(
-        m["role"] == "tool" for m in messages
-    )
-
     url = settings.local_llm_base_url.rstrip("/") + "/chat/completions"
-    first_turn = True  # true solo en el primer ciclo del while
     try:
         while True:
             payload: dict[str, Any] = {
                 "model": settings.local_llm_model,
                 "messages": messages,
                 "stream": True,
+                "max_tokens": 512,
+                "temperature": 0.2,
             }
-            # Solo enviar herramientas si NO estamos forzando ficha de receta
             if not force_recipe:
                 payload["tools"] = openai_tools()
-                # En el primer turno y si aún no se consultó el inventario,
-                # forzar get_inventario para evitar que el modelo invente ingredientes
-                if first_turn and not inventario_ya_consultado:
-                    payload["tool_choice"] = {
-                        "type": "function",
-                        "function": {"name": "get_inventario"},
-                    }
-                else:
-                    payload["tool_choice"] = "auto"
+                payload["tool_choice"] = "auto"
             first_turn = False
             text = ""
             emitted = 0
@@ -388,7 +398,14 @@ def _build_oci_auth() -> Any:
 
     if settings.oci_auth_type == "instance_principal":
         return OciInstancePrincipalAuth()
-    return OciUserPrincipalAuth()  # default: api_key via ~/.oci/config
+    try:
+        return OciUserPrincipalAuth()  # default: api_key via ~/.oci/config
+    except Exception as exc:
+        # Si api_key falla (ej: ~/.oci/config no existe dentro de Docker en la VM OCI),
+        # usar automáticamente Instance Principal de OCI
+        if "ConfigFileNotFound" in type(exc).__name__:
+            return OciInstancePrincipalAuth()
+        raise
 
 
 def _build_oci_client() -> Any:

@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     oci_region: str = "us-ashburn-1"
     oci_model_id: str = "meta.llama-3.3-70b-instruct"
     oci_service_endpoint: str | None = None
-    # "api_key" lee ~/.oci/config (desarrollo local)
     # "instance_principal" usa el IAM role de la VM (producción OCI)
-    oci_auth_type: str = "api_key"
+    # "api_key" lee ~/.oci/config (desarrollo local)
+    oci_auth_type: str = "instance_principal"
     oci_timeout_seconds: int = 30
 
     # ── llama.cpp local (fallback) ─────────────────────────────────────────

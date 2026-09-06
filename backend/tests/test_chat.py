@@ -239,6 +239,31 @@ def test_build_oci_auth_api_key(monkeypatch):
     mock_oci_openai.OciUserPrincipalAuth.assert_called_once()
 
 
+def test_build_oci_auth_api_key_fallback_to_instance_principal(monkeypatch):
+    import sys
+    from unittest.mock import MagicMock
+    from app.agent import llm as llm_mod
+
+    mock_oci_openai = MagicMock()
+    class DummyConfigFileNotFound(Exception):
+        pass
+    DummyConfigFileNotFound.__name__ = "ConfigFileNotFound"
+    mock_oci_openai.OciUserPrincipalAuth.side_effect = DummyConfigFileNotFound("Config file not found")
+    monkeypatch.setitem(sys.modules, "oci_openai", mock_oci_openai)
+    monkeypatch.setattr(llm_mod.settings, "oci_auth_type", "api_key")
+
+    llm_mod._build_oci_auth()
+    mock_oci_openai.OciInstancePrincipalAuth.assert_called_once()
+
+
+def test_get_inventario_summary(patched_tools):
+    from app.agent.llm import get_inventario_summary
+
+    summary = get_inventario_summary()
+    assert "arroz" in summary
+    assert "aceite de oliva" in summary
+
+
 # ---------------------------------------------------------------------------
 # stream_chat & Hybrid AI Fallback tests (Task 3)
 # ---------------------------------------------------------------------------
