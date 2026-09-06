@@ -644,3 +644,61 @@ def test_stream_chat_aligns_recipe_to_pantry_and_prunes_hallucinations(monkeypat
     assert not any(i["nombre"] == "ají" for i in ingredientes)
 
 
+def test_stream_chat_reconciles_instructions_and_adjusts_portions(monkeypatch, engine):
+    from app.agent import agent as agent_mod
+    from app.schemas import ChatMessage
+
+    monkeypatch.setattr(agent_mod, "generate_recipe_image", lambda recipe, recipe_hash: None)
+
+    recipe_payload = (
+        "```json\n"
+        "{\n"
+        '  "nombre": "Arroz con verduras y atún",\n'
+        '  "resumen": "Arroz salteado con atún",\n'
+        '  "tiempo_minutos": 25,\n'
+        '  "ingredientes": [\n'
+        '    {"nombre": "arroz", "cantidad": 1000, "unidad": "g"},\n'
+        '    {"nombre": "atún", "cantidad": 2, "unidad": "latas"}\n'
+        '  ],\n'
+        '  "instrucciones": "1. Calienta el aceite de oliva en una plancha.\\n'
+        '2. Ponga la cebolla y el ajo en el aceite.\\n'
+        '3. Agrega las verduras y el atún salteado al arroz."\n'
+        "}\n"
+        "```"
+    )
+
+    async def fake_local_stream(messages, force_recipe=False):
+        yield TurnEvent("text", recipe_payload)
+
+    monkeypatch.setattr(agent_mod, "local_stream", fake_local_stream)
+    monkeypatch.setattr(agent_mod.settings, "llm_provider", "local")
+
+    async def _run():
+        events = []
+        async for ev in agent_mod.stream_chat([ChatMessage(role="user", content="algo con atún y arroz")]):
+            events.append(ev)
+        return events
+
+    events = asyncio.run(_run())
+    recipe_event = next(e for e in events if e.event == "recipe")
+    ingredientes = recipe_event.data["ingredientes"]
+    ing_map = {i["nombre"]: i for i in ingredientes}
+
+    # 1. Cantidad de arroz ajustada de 1000g a porción realista (200g)
+    assert "arroz" in ing_map
+    assert ing_map["arroz"]["cantidad"] == 200.0
+
+    # 2. Atún presente
+    assert "atún" in ing_map
+
+    # 3. Ingredientes reconciliados desde las instrucciones:
+    assert "aceite de oliva" in ing_map
+    assert ing_map["aceite de oliva"]["cantidad"] == 15.0
+    assert "cebolla" in ing_map
+    assert "ajo" in ing_map
+
+    # 4. Verdura de la despensa reconciliada al mencionar "verduras"
+    assert any(name in ing_map for name in ["zanahoria", "pimiento morrón", "brócoli", "tomate"])
+
+
+

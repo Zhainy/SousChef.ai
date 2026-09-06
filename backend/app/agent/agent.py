@@ -210,18 +210,163 @@ async def stream_chat(
         recipe = _extract_recipe(text)
         if recipe is not None:
             try:
-                from sqlmodel import Session
-                from ..db import engine
-                from ..inventory import find_ingredient
+                from sqlmodel import Session, select
+                from .. import db as db_mod
+                from ..models import Ingredient
+                from ..inventory import find_ingredient, normalize
 
-                with Session(engine) as session:
+                with Session(db_mod.engine) as session:
+                    all_pantry = list(
+                        session.exec(select(Ingredient).where(Ingredient.cantidad > 0)).all()
+                    )
+                    instrucciones_text = normalize(recipe.get("instrucciones") or "")
+                    recipe_title = normalize(recipe.get("nombre") or "")
+
                     valid_ingredientes = []
+                    seen_names: set[str] = set()
+
                     for ing in recipe.get("ingredientes", []):
                         nombre_ing = ing.get("nombre", "")
+                        norm_nombre = normalize(nombre_ing)
+
+                        # Si el modelo usó un término genérico como "verduras" o "vegetales"
+                        if norm_nombre in {"verdura", "verduras", "vegetal", "vegetales"}:
+                            for row in all_pantry:
+                                r_norm = normalize(row.nombre)
+                                if row.categoria == "verduras" and r_norm not in seen_names:
+                                    if any(
+                                        v in r_norm
+                                        for v in [
+                                            "zanahoria",
+                                            "pimiento",
+                                            "morron",
+                                            "brocoli",
+                                            "espinaca",
+                                            "tomate",
+                                        ]
+                                    ):
+                                        cant = (
+                                            100.0
+                                            if row.unidad == "g"
+                                            else (
+                                                1.0
+                                                if row.unidad == "piezas"
+                                                else min(row.cantidad, 1.0)
+                                            )
+                                        )
+                                        valid_ingredientes.append({
+                                            "nombre": row.nombre,
+                                            "cantidad": cant,
+                                            "unidad": row.unidad,
+                                        })
+                                        seen_names.add(r_norm)
+                                        break
+                            continue
+
                         matched = find_ingredient(session, nombre_ing)
                         if matched is not None:
+                            m_norm = normalize(matched.nombre)
+                            cant = float(ing.get("cantidad", 1.0))
+                            # Si el modelo copió todo el stock de golpe para un ingrediente base (ej: 1000g de arroz)
+                            if (
+                                matched.unidad in {"g", "gramos"}
+                                and cant >= 400.0
+                                and cant == matched.cantidad
+                            ):
+                                if m_norm in {"arroz", "pasta", "lentejas", "garbanzos", "avena"}:
+                                    cant = 200.0
                             ing["nombre"] = matched.nombre
+                            ing["cantidad"] = cant
+                            ing["unidad"] = (
+                                matched.unidad if not ing.get("unidad") else ing.get("unidad")
+                            )
                             valid_ingredientes.append(ing)
+                            seen_names.add(m_norm)
+
+                    # Reconciliación: Recuperar ingredientes de la despensa que fueron expresamente
+                    # mencionados en las instrucciones o en el título pero omitidos en el JSON
+                    for row in all_pantry:
+                        row_norm = normalize(row.nombre)
+                        if row_norm in seen_names:
+                            continue
+
+                        mentioned = False
+                        if row_norm in instrucciones_text:
+                            mentioned = True
+                        else:
+                            row_tokens = [
+                                t
+                                for t in row_norm.split()
+                                if t
+                                not in {"de", "del", "la", "el", "en", "al", "molida", "rallado"}
+                            ]
+                            if row_tokens and all(
+                                re.search(rf"\b{re.escape(t)}\b", instrucciones_text)
+                                for t in row_tokens
+                            ):
+                                mentioned = True
+
+                        if mentioned:
+                            if row.unidad in {"ml", "mililitros"}:
+                                cant = min(row.cantidad, 15.0)
+                            elif row.unidad in {"piezas", "pieza"}:
+                                cant = min(row.cantidad, 1.0)
+                            elif row.unidad in {"latas", "lata"}:
+                                cant = min(row.cantidad, 1.0)
+                            elif row.unidad in {"g", "gramos"}:
+                                cant = min(
+                                    row.cantidad, 50.0 if row.categoria == "verduras" else 5.0
+                                )
+                            else:
+                                cant = min(row.cantidad, 1.0)
+
+                            valid_ingredientes.append({
+                                "nombre": row.nombre,
+                                "cantidad": cant,
+                                "unidad": row.unidad,
+                            })
+                            seen_names.add(row_norm)
+
+                    # Si el título o las instrucciones hablan de verduras y no se incluyó verdura principal
+                    if any(
+                        w in recipe_title or w in instrucciones_text
+                        for w in ["verdura", "verduras", "vegetal", "vegetales"]
+                    ):
+                        main_veggies = [
+                            vi
+                            for vi in valid_ingredientes
+                            if any(
+                                normalize(row.nombre) == normalize(vi["nombre"])
+                                and row.categoria == "verduras"
+                                and normalize(row.nombre) not in {"cebolla", "ajo"}
+                                for row in all_pantry
+                            )
+                        ]
+                        if not main_veggies:
+                            for row in all_pantry:
+                                r_norm = normalize(row.nombre)
+                                if (
+                                    row.categoria == "verduras"
+                                    and r_norm not in seen_names
+                                    and r_norm not in {"cebolla", "ajo"}
+                                ):
+                                    cant = (
+                                        100.0
+                                        if row.unidad == "g"
+                                        else (
+                                            1.0
+                                            if row.unidad == "piezas"
+                                            else min(row.cantidad, 1.0)
+                                        )
+                                    )
+                                    valid_ingredientes.append({
+                                        "nombre": row.nombre,
+                                        "cantidad": cant,
+                                        "unidad": row.unidad,
+                                    })
+                                    seen_names.add(r_norm)
+                                    break
+
                     if valid_ingredientes:
                         recipe["ingredientes"] = valid_ingredientes
             except Exception:

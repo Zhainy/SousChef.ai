@@ -84,22 +84,32 @@ SYSTEM_INSTRUCTION_LOCAL = (
     "3. STOCK REAL Y NOMBRES EXACTOS: Usa ÚNICAMENTE ingredientes presentes en la lista de despensa. "
     "Copia los nombres EXACTOS de la lista (por ejemplo: si en la despensa dice 'pechuga de pollo', pon 'pechuga de pollo', NO 'pollo'; si dice 'aceite de oliva', pon 'aceite de oliva'). "
     "PROHIBIDO inventar ingredientes, especias o condimentos que no figuren en la despensa: NO agregues pimienta negra, ají, comino ni ningún otro ingrediente a menos que aparezca explícitamente en la lista de despensa. Si la despensa solo tiene sal y orégano, condimenta únicamente con sal y orégano.\n"
-    "4. FORMATO OBLIGATORIO: Presenta tu propuesta en 1 sola frase breve y amable, "
+    "4. EXHAUSTIVIDAD Y COHERENCIA: TODO ingrediente que uses o menciones en las instrucciones (ej: aceite de oliva, cebolla, ajo, etc.) DEBE estar incluido obligatoriamente en el arreglo 'ingredientes' del JSON con su cantidad y unidad. "
+    "NUNCA uses la palabra genérica 'verduras'; indica los nombres específicos de las verduras de la despensa (ej: 'cebolla', 'zanahoria', 'pimiento morrón').\n"
+    "5. CANTIDADES Y PORCIONES REALISTAS: Usa cantidades culinarias normales para 2 personas (ej: 150-250 g de arroz o pasta, 15-30 ml de aceite, 1 lata de atún, 1-2 piezas de verdura). "
+    "NUNCA uses todo el paquete o stock completo si es excesivo (NO pongas 1000 g de arroz si solo preparas una comida).\n"
+    "6. FORMATO OBLIGATORIO: Presenta tu propuesta en 1 sola frase breve y amable, "
     "e incluye SIEMPRE la receta en un bloque de código JSON con este esquema exacto:\n"
     "```json\n"
     '{"nombre": "Nombre del plato solicitado", "resumen": "Descripción apetitosa en una frase", '
-    '"tiempo_minutos": 20, '
-    '"ingredientes": [{"nombre": "nombre_exacto_de_despensa", "cantidad": 100, "unidad": "g"}], '
-    '"instrucciones": "1. Paso uno.\\n2. Paso dos."}\n'
+    '"tiempo_minutos": 25, '
+    '"ingredientes": [\n'
+    '  {"nombre": "ingrediente_principal_despensa", "cantidad": 200, "unidad": "g"},\n'
+    '  {"nombre": "verdura_especifica_despensa", "cantidad": 1, "unidad": "piezas"},\n'
+    '  {"nombre": "aceite_o_condimento_despensa", "cantidad": 15, "unidad": "ml"}\n'
+    '], '
+    '"instrucciones": "1. Paso uno detallado.\\n2. Paso dos detallado."}\n'
     "```\n"
-    "5. REGLA CRÍTICA: PROHIBIDO redactar listas de ingredientes o pasos fuera del bloque ```json. "
+    "7. REGLA CRÍTICA: PROHIBIDO redactar listas de ingredientes o pasos fuera del bloque ```json. "
     "Todo el detalle culinario va DENTRO del JSON para que el sistema genere la tarjeta visual.\n"
-    "6. Responde siempre en español.\n"
+    "8. Responde siempre en español.\n"
 )
 
 FORCE_RECIPE_HINT = (
-    "\n\n7. El usuario acaba de solicitar la ficha técnica de la receta del plato recién mencionado. "
+    "\n\n9. El usuario acaba de solicitar la ficha técnica de la receta del plato recién mencionado. "
     "Entrega de inmediato el bloque ```json con el esquema indicado arriba usando ÚNICAMENTE ingredientes de la despensa con sus nombres exactos. "
+    "Incluye en 'ingredientes' TODOS los elementos que uses en las instrucciones (aceite de oliva, cebolla, ajo, etc.), "
+    "con nombres específicos (PROHIBIDO poner 'verduras' genéricas) y porciones culinarias realistas (ej: 200 g de arroz, no 1000 g). "
     "NO agregues pimienta, ají ni condimentos ausentes de la despensa. "
     "NO agregues texto narrativo fuera del bloque ```json."
 )

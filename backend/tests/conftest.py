@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 import app.agent.tools as tools_mod
+import app.db as db_mod
 from app.db import get_session
 from app.main import app
 from app.seed import seed_data
@@ -24,9 +25,10 @@ def engine():
     return test_engine
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def patched_tools(engine: object, monkeypatch):
     monkeypatch.setattr(tools_mod, "engine", engine)
+    monkeypatch.setattr(db_mod, "engine", engine)
     return engine
 
 
